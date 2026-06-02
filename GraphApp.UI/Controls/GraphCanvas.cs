@@ -37,10 +37,21 @@ public class GraphCanvas : UserControl
     private readonly Font _weightFont = new("Segoe UI", 7.5f);
     private readonly Font _secFont    = new("Segoe UI", 7.5f);
 
-    // ─── State ─────────────────────────────────────────────────────────
+    // ─── State ─────────────────────────────────────────────────
     private Graph          _graph       = new();
     private AlgorithmStep? _currentStep;
     private CanvasMode     _mode        = CanvasMode.Select;
+
+    // ── Zoom + Pan ─────────────────────────────────────
+    private const float MinZoom   = 0.15f;
+    private const float MaxZoom   = 5.00f;
+    private float  _zoom          = 1.0f;
+    private PointF _panOffset     = PointF.Empty;
+
+    // Middle-click pan state
+    private bool   _isPanning       = false;
+    private PointF _panStart        = PointF.Empty;
+    private PointF _panOffsetStart  = PointF.Empty;
 
     // Drag state (Select mode)
     private Node?  _dragNode   = null;
@@ -93,6 +104,45 @@ public class GraphCanvas : UserControl
 
     public Graph GetGraph() => _graph;
 
+    // ── Zoom / Pan API ────────────────────────────────────
+
+    /// <summary>
+    /// Zoom + pan để toàn bộ đồ thị vừa khớp canvas (có margin).
+    /// </summary>
+    public void FitToScreen()
+    {
+        if (_graph.Nodes.Count == 0) { ResetView(); return; }
+
+        float minX = _graph.Nodes.Min(n => n.Position.X) - NodeRadius * 2;
+        float maxX = _graph.Nodes.Max(n => n.Position.X) + NodeRadius * 2;
+        float minY = _graph.Nodes.Min(n => n.Position.Y) - NodeRadius * 2;
+        float maxY = _graph.Nodes.Max(n => n.Position.Y) + NodeRadius * 2;
+
+        float gw = maxX - minX;
+        float gh = maxY - minY;
+        if (gw < 1) gw = 1;
+        if (gh < 1) gh = 1;
+
+        float margin = 50f;
+        float scaleX = (Width  - 2 * margin) / gw;
+        float scaleY = (Height - 2 * margin) / gh;
+        _zoom = Math.Clamp(Math.Min(scaleX, scaleY), MinZoom, MaxZoom);
+
+        float cx = (minX + maxX) / 2f;
+        float cy = (minY + maxY) / 2f;
+        _panOffset = new PointF(Width / 2f - cx * _zoom, Height / 2f - cy * _zoom);
+
+        Invalidate();
+    }
+
+    /// <summary>Reset zoom = 1, pan = 0.</summary>
+    public void ResetView()
+    {
+        _zoom      = 1.0f;
+        _panOffset = PointF.Empty;
+        Invalidate();
+    }
+
     // ─── OnPaint ───────────────────────────────────────────────────────
 
     protected override void OnPaint(PaintEventArgs e)
@@ -102,10 +152,20 @@ public class GraphCanvas : UserControl
         g.SmoothingMode     = SmoothingMode.AntiAlias;
         g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
 
+        // ── Nền (screen space) ──
         DrawBackground(g);
+
+        // ── World-space: áp dụng zoom + pan ──
+        g.TranslateTransform(_panOffset.X, _panOffset.Y);
+        g.ScaleTransform(_zoom, _zoom);
+
         DrawEdges(g);
         DrawNodes(g);
+
+        // ── Screen-space hints (sau khi reset transform) ──
+        g.ResetTransform();
         DrawModeHint(g);
+        DrawZoomIndicator(g);
     }
 
     // ─── Background ────────────────────────────────────────────────────
@@ -113,10 +173,17 @@ public class GraphCanvas : UserControl
     private void DrawBackground(Graphics g)
     {
         g.Clear(CBackground);
+
+        // Grid điểm chấm — offset theo pan (không scale theo zoom để giữ đơn giản)
         const int spacing = 30;
+        float ox = _panOffset.X % spacing;
+        float oy = _panOffset.Y % spacing;
+        if (ox < 0) ox += spacing;
+        if (oy < 0) oy += spacing;
+
         using var dotBrush = new SolidBrush(CGrid);
-        for (int x = spacing; x < Width;  x += spacing)
-        for (int y = spacing; y < Height; y += spacing)
+        for (float x = ox; x < Width;  x += spacing)
+        for (float y = oy; y < Height; y += spacing)
             g.FillEllipse(dotBrush, x - 1, y - 1, 2.5f, 2.5f);
     }
 
@@ -311,55 +378,95 @@ public class GraphCanvas : UserControl
         g.DrawString(hint, f, b, (Width - sz.Width) / 2f, Height - sz.Height - 12);
     }
 
-    // ─── Mouse Events (TASK-04) ────────────────────────────────────────
+    // ─── Coordinate Conversion ──────────────────────────────────────
+
+    /// <summary>Chuyển điểm từ screen (pixel) → world (tọa độ đồ thị).</summary>
+    private PointF ScreenToWorld(PointF screen) =>
+        new((screen.X - _panOffset.X) / _zoom,
+            (screen.Y - _panOffset.Y) / _zoom);
+
+    // ─── Mouse Events ────────────────────────────────────────────
 
     protected override void OnMouseDown(MouseEventArgs e)
     {
         base.OnMouseDown(e);
+
+        // ── Middle-click: start pan ──
+        if (e.Button == MouseButtons.Middle)
+        {
+            _isPanning      = true;
+            _panStart       = new PointF(e.X, e.Y);
+            _panOffsetStart = _panOffset;
+            Cursor          = Cursors.SizeAll;
+            return;
+        }
+
         if (e.Button != MouseButtons.Left) return;
 
-        var clickPt = new PointF(e.X, e.Y);
+        var worldPt = ScreenToWorld(new PointF(e.X, e.Y));
 
         switch (_mode)
         {
-            case CanvasMode.AddNode:
-                HandleAddNode(clickPt);
-                break;
-
-            case CanvasMode.AddEdge:
-                HandleAddEdge(clickPt);
-                break;
-
-            case CanvasMode.Delete:
-                HandleDelete(clickPt);
-                break;
-
-            case CanvasMode.Select:
-                HandleSelectDown(clickPt);
-                break;
+            case CanvasMode.AddNode:  HandleAddNode(worldPt);   break;
+            case CanvasMode.AddEdge:  HandleAddEdge(worldPt);   break;
+            case CanvasMode.Delete:   HandleDelete(worldPt);    break;
+            case CanvasMode.Select:   HandleSelectDown(worldPt); break;
         }
     }
 
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
-        if (_mode != CanvasMode.Select || _dragNode == null) return;
 
-        // Cập nhật vị trí node khi kéo
-        _dragNode.Position = new PointF(
-            e.X - _dragOffset.X,
-            e.Y - _dragOffset.Y);
+        // ── Pan (middle button) ──
+        if (_isPanning)
+        {
+            _panOffset = new PointF(
+                _panOffsetStart.X + e.X - _panStart.X,
+                _panOffsetStart.Y + e.Y - _panStart.Y);
+            Invalidate();
+            return;
+        }
+
+        // ── Drag node (left button, Select mode) ──
+        if (_mode != CanvasMode.Select || _dragNode == null) return;
+        var world = ScreenToWorld(new PointF(e.X, e.Y));
+        _dragNode.Position = new PointF(world.X - _dragOffset.X, world.Y - _dragOffset.Y);
         Invalidate();
     }
 
     protected override void OnMouseUp(MouseEventArgs e)
     {
         base.OnMouseUp(e);
-        if (_dragNode == null) return;
 
-        // Kết thúc drag: fire event
+        // ── End pan ──
+        if (e.Button == MouseButtons.Middle)
+        {
+            _isPanning = false;
+            Cursor     = ModeToCursor(_mode);
+            return;
+        }
+
+        if (_dragNode == null) return;
         _dragNode = null;
         GraphChanged?.Invoke(_graph);
+        Invalidate();
+    }
+
+    protected override void OnMouseWheel(MouseEventArgs e)
+    {
+        base.OnMouseWheel(e);
+
+        float factor  = e.Delta > 0 ? 1.15f : 1f / 1.15f;
+        float newZoom = Math.Clamp(_zoom * factor, MinZoom, MaxZoom);
+        if (Math.Abs(newZoom - _zoom) < 0.001f) return;
+
+        // Zoom quanh con trỏ chuột: giữ world point dưới cursor cố định
+        float wx = (e.X - _panOffset.X) / _zoom;
+        float wy = (e.Y - _panOffset.Y) / _zoom;
+        _zoom      = newZoom;
+        _panOffset = new PointF(e.X - wx * _zoom, e.Y - wy * _zoom);
+
         Invalidate();
     }
 
@@ -460,13 +567,13 @@ public class GraphCanvas : UserControl
         }
     }
 
-    private void HandleSelectDown(PointF pt)
+    private void HandleSelectDown(PointF worldPt)
     {
-        var node = HitTestNode(pt);
+        var node = HitTestNode(worldPt);
         if (node == null) return;
 
         _dragNode   = node;
-        _dragOffset = new PointF(pt.X - node.Position.X, pt.Y - node.Position.Y);
+        _dragOffset = new PointF(worldPt.X - node.Position.X, worldPt.Y - node.Position.Y);
     }
 
     // ─── Hit Testing ───────────────────────────────────────────────────
@@ -518,7 +625,25 @@ public class GraphCanvas : UserControl
         _                  => Cursors.Default
     };
 
-    // ─── Constructor & Dispose ─────────────────────────────────────────
+    // ─── Zoom Indicator ───────────────────────────────────────────
+
+    private void DrawZoomIndicator(Graphics g)
+    {
+        if (Math.Abs(_zoom - 1.0f) < 0.02f) return;   // nối bật khi zoom ≠ 100%
+
+        string txt = $"🔍 {_zoom * 100:F0}%";
+        using var f = new Font("Segoe UI", 8.5f, FontStyle.Bold);
+        var sz = g.MeasureString(txt, f);
+        float rx = Width  - sz.Width  - 14;
+        float ry = Height - sz.Height - 14;
+
+        using var bg  = new SolidBrush(Color.FromArgb(180, 40, 44, 52));
+        using var fg  = new SolidBrush(Color.FromArgb(220, 200, 220, 255));
+        g.FillRectangle(bg, rx - 4, ry - 2, sz.Width + 12, sz.Height + 6);
+        g.DrawString(txt, f, fg, rx + 2, ry + 1);
+    }
+
+    // ─── Constructor & Dispose ────────────────────────────────────
 
     public GraphCanvas()
     {

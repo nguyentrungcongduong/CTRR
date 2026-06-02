@@ -261,6 +261,17 @@ public partial class MainForm : Form
         ts.Items.Add(new ToolStripSeparator());
         ts.Items.Add(ddSample);
         ts.Items.Add(btnClear);
+
+        // ── Zoom controls ─────────────────────────────────────
+        ts.Items.Add(new ToolStripSeparator());
+
+        var btnFit = MakeActionBtn("🔲  Vừa màn hình", "Zoom và pan để hiển thị toàn bộ đồ thị [F]");
+        btnFit.Click += (_, _) => _canvas.FitToScreen();
+        ts.Items.Add(btnFit);
+
+        var btnZoomReset = MakeActionBtn("🔍 100%", "Reset zoom về 100% [Ctrl+0]");
+        btnZoomReset.Click += (_, _) => _canvas.ResetView();
+        ts.Items.Add(btnZoomReset);
         ts.Items.Add(new ToolStripSeparator());
 
         // ── Save / Load ────────────────────────────────────────────────
@@ -1008,6 +1019,13 @@ public partial class MainForm : Form
                 if (_btnRun.Enabled && !_engine.HasSteps)
                 { OnRunClicked(null, EventArgs.Empty); return true; }
                 break;
+            case Keys.F:
+                _canvas.FitToScreen();
+                return true;
+            case Keys.Control | Keys.D0:
+            case Keys.Control | Keys.NumPad0:
+                _canvas.ResetView();
+                return true;
         }
         return base.ProcessCmdKey(ref msg, keyData);
     }
