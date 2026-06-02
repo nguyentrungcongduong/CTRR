@@ -64,9 +64,9 @@ public partial class MainForm : Form
             ["Kiểm tra 2 phía (Bipartite)"]      = (g, _) => BipartiteChecker.Run(g),
             ["Prim – Cây khung nhỏ nhất (MST)"]  = (g, s) => Prim.Run(g, s),
             ["Kruskal – Cây khung nhỏ nhất"]     = (g, _) => Kruskal.Run(g),
-            // Ford-Fulkerson: startNode = source, sink = last node trong graph
             ["Ford-Fulkerson – Luồng cực đại"]   = (g, s) =>
                 FordFulkerson.Run(g, s, g.Nodes.LastOrDefault()?.Id ?? s),
+            ["Fleury – Đường/Chu trình Euler"]   = (g, s) => Fleury.Run(g, s),
         };
 
     // ─── Constructor ───────────────────────────────────────────────────
