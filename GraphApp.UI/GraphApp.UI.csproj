@@ -8,7 +8,7 @@
     <UseWindowsForms>true</UseWindowsForms>
     <RootNamespace>GraphApp.UI</RootNamespace>
     <AssemblyName>GraphApp.UI</AssemblyName>
-    <ApplicationIcon>Resources\app.ico</ApplicationIcon>
+    <!-- ApplicationIcon will be added in TASK-19 (Polish phase) -->
   </PropertyGroup>
 
   <ItemGroup>

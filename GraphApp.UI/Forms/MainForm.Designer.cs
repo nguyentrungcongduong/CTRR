@@ -1,3 +1,4 @@
+#nullable enable
 namespace GraphApp.UI.Forms;
 
 partial class MainForm

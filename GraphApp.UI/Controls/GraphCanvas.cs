@@ -28,13 +28,17 @@ public class GraphCanvas : UserControl
     private AlgorithmStep? _currentStep;
     private CanvasMode _mode = CanvasMode.Select;
 
+#pragma warning disable CS0169, CS0414  // Stubs — sẽ dùng ở TASK-03/04
     private Node? _dragNode;
     private PointF _dragOffset;
     private int _edgeFirstNodeId = -1;   // id đỉnh đầu tiên khi thêm cạnh
+#pragma warning restore CS0169, CS0414
 
     // ─── Public API ────────────────────────────────────────────────────
 
+#pragma warning disable CS0067  // Event sẽ được raise ở TASK-04
     public event Action<Graph>? GraphChanged;
+#pragma warning restore CS0067
 
     public CanvasMode Mode
     {

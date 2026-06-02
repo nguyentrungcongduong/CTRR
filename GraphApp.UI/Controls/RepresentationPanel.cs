@@ -16,7 +16,9 @@ public class RepresentationPanel : UserControl
     private readonly RichTextBox _adjListBox;
     private readonly ListView _edgeListView;
 
+#pragma warning disable CS0067  // Event sẽ được raise ở TASK-11
     public event Action<Graph>? GraphImported;
+#pragma warning restore CS0067
 
     public RepresentationPanel()
     {
