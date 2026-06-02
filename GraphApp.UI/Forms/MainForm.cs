@@ -529,14 +529,20 @@ public partial class MainForm : Form
         Margin    = new Padding(0, 6, 4, 0)
     };
 
-    private static Button MakeAnimBtn(string text, string tooltip, int width = 42) => new()
+    private static Button MakeAnimBtn(string text, string tooltip, int width = 42)
     {
-        Text      = text, ToolTipText = tooltip,
-        Width     = width, Height = 28,
-        BackColor = Color.FromArgb(55, 60, 75), ForeColor = Color.White,
-        FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5f),
-        Cursor    = Cursors.Hand, Margin = new Padding(2, 0, 2, 0)
-    };
+        var btn = new Button
+        {
+            Text      = text,
+            Width     = width, Height = 28,
+            BackColor = Color.FromArgb(55, 60, 75), ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5f),
+            Cursor    = Cursors.Hand, Margin = new Padding(2, 0, 2, 0)
+        };
+        // Button không có ToolTipText — dùng ToolTip component
+        new ToolTip().SetToolTip(btn, tooltip);
+        return btn;
+    }
 
     // ─── Sample Graph ──────────────────────────────────────────────────
 
