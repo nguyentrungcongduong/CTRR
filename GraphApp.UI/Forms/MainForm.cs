@@ -15,11 +15,12 @@ namespace GraphApp.UI.Forms;
 public partial class MainForm : Form
 {
     // ─── Core Controls ─────────────────────────────────────────────────
-    private readonly GraphCanvas    _canvas;
-    private readonly ToolStrip      _toolbar;
-    private readonly StatusStrip    _statusBar;
-    private readonly Panel          _animPanel;
-    private readonly AnimationEngine _engine = new();
+    private readonly GraphCanvas        _canvas;
+    private readonly ToolStrip          _toolbar;
+    private readonly StatusStrip        _statusBar;
+    private readonly Panel              _animPanel;
+    private readonly RepresentationPanel _repPanel;
+    private readonly AnimationEngine    _engine = new();
 
     // Toolbar mode buttons
     private readonly ToolStripButton _btnSelect;
@@ -68,17 +69,21 @@ public partial class MainForm : Form
                                   out _btnDelete, out _btnDirected);
         _animPanel = BuildAnimPanel();
         _statusBar = BuildStatusBar(out _lblNodes, out _lblEdges, out _lblMode, out _lblDirected);
+        _repPanel  = BuildRepresentationPanel();
 
         // Thứ tự Add quyết định vị trí Dock:
-        // Thêm trước = z-order thấp = bị đẩy vào trong
-        Controls.Add(_canvas);      // Fill — thêm trước → fill phần còn lại
+        Controls.Add(_canvas);      // Fill
+        Controls.Add(_repPanel);    // Right — thêm trước toolbar để toolbar ưu tiên
         Controls.Add(_toolbar);     // Top
-        Controls.Add(_animPanel);   // Bottom — thêm trước statusBar → ngay trên statusBar
-        Controls.Add(_statusBar);   // Bottom — thêm sau → dán sát đáy
+        Controls.Add(_animPanel);   // Bottom
+        Controls.Add(_statusBar);   // Bottom (outermost)
 
         // Engine events
         _engine.OnStepChanged += OnEngineStepChanged;
         _engine.OnFinished    += OnEngineFinished;
+
+        // RepresentationPanel events
+        _repPanel.GraphApplied += OnRepPanelGraphApplied;
 
         // Form settings
         Text          = "GraphApp — Ứng dụng Đồ thị";
@@ -96,7 +101,14 @@ public partial class MainForm : Form
     private GraphCanvas BuildCanvas()
     {
         var c = new GraphCanvas { Dock = DockStyle.Fill };
-        c.GraphChanged += _ => { RefreshStartNodeCombo(); UpdateStatus(); };
+        c.GraphChanged += _ =>
+        {
+            RefreshStartNodeCombo();
+            UpdateStatus();
+            // Sync RepresentationPanel
+            if (_repPanel.Visible)
+                _repPanel.RefreshFromGraph(_canvas.GetGraph());
+        };
         return c;
     }
 
@@ -167,9 +179,60 @@ public partial class MainForm : Form
         ts.Items.Add(new ToolStripSeparator());
         ts.Items.Add(btnSample);
         ts.Items.Add(btnClear);
+        ts.Items.Add(new ToolStripSeparator());
+
+        // Toggle RepresentationPanel
+        var btnRep = MakeActionBtn("📊  Biểu Diễn", "Hiện/ẩn panel biểu diễn đồ thị");
+        btnRep.CheckOnClick = true;
+        var repBtn = btnRep;
+        repBtn.CheckedChanged += (_, _) =>
+        {
+            _repPanel.Visible = repBtn.Checked;
+            if (repBtn.Checked) _repPanel.RefreshFromGraph(_canvas.GetGraph());
+        };
+        ts.Items.Add(btnRep);
+
+        // InputMatrixForm button
+        var btnMatrix = MakeActionBtn("📝  Nhập Ma Trận", "Nhập đồ thị từ ma trận kề");
+        btnMatrix.Click += (_, _) =>
+        {
+            using var form = new InputMatrixForm();
+            if (form.ShowDialog(this) == DialogResult.OK && form.ResultGraph != null)
+            {
+                _engine.Pause();
+                _canvas.RefreshGraph(form.ResultGraph);
+                _btnDirected.Checked = form.ResultGraph.Directed;
+                RefreshStartNodeCombo();
+                ResetAnimUI();
+                UpdateStatus();
+                if (_repPanel.Visible)
+                    _repPanel.RefreshFromGraph(_canvas.GetGraph());
+            }
+        };
+        ts.Items.Add(btnMatrix);
 
         SelectModeBtn(btnSelect);
         return ts;
+    }
+
+    // ─── Build RepresentationPanel ─────────────────────────────────────
+
+    private RepresentationPanel BuildRepresentationPanel()
+    {
+        var panel = new RepresentationPanel { Visible = false };
+        return panel;
+    }
+
+    private void OnRepPanelGraphApplied(Graph newGraph)
+    {
+        _engine.Pause();
+        _canvas.RefreshGraph(newGraph);
+        _btnDirected.Checked = newGraph.Directed;
+        RefreshStartNodeCombo();
+        ResetAnimUI();
+        UpdateStatus();
+        // Sync lại tất cả 3 tab
+        _repPanel.RefreshFromGraph(_canvas.GetGraph());
     }
 
     // ─── Build AnimPanel ───────────────────────────────────────────────
