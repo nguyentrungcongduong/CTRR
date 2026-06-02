@@ -1,0 +1,44 @@
+## .NET / C# gitignore
+
+# Build outputs
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.userprefs
+*.pidb
+
+# ReSharper
+_ReSharper*/
+*.ReSharper
+.idea/
+
+# NuGet
+*.nupkg
+*.snupkg
+**/packages/*
+!**/packages/build/
+nuget.config
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# MSTest results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+
+# Rider
+.idea/
+
+# OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
