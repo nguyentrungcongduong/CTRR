@@ -1038,10 +1038,12 @@ public partial class MainForm : Form
                 break;
             case Keys.F:
                 _canvas.FitToScreen();
+                return true;
             case Keys.Control | Keys.D0:
             case Keys.Control | Keys.NumPad0:
                 _canvas.ResetView();
                 return true;
+
             // Undo / Redo / Export
             case Keys.Control | Keys.Z:
                 DoUndo(); return true;
