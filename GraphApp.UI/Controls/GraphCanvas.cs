@@ -178,25 +178,52 @@ public class GraphCanvas : UserControl
         float mx = (from.X + to.X) / 2f;
         float my = (from.Y + to.Y) / 2f;
 
+        // Offset label perpendicular to edge để tránh chồng lên cạnh
+        float dx = to.X - from.X, dy = to.Y - from.Y;
+        float len = (float)Math.Sqrt(dx * dx + dy * dy);
+        if (len > 0) { float nx = -dy / len * 12f; float ny = dx / len * 12f; mx += nx; my += ny; }
+
+        bool isFlowLabel = false;
         string text = string.Empty;
+
         if (_currentStep?.EdgeLabels.TryGetValue(edge.Id, out var sl) == true)
+        {
             text = sl;
+            isFlowLabel = text.Contains('/');   // "flow/capacity" format
+        }
         else if (edge.Weight != 1.0)
+        {
             text = edge.Weight % 1 == 0
                 ? ((int)edge.Weight).ToString()
                 : edge.Weight.ToString("G4");
+        }
 
         if (string.IsNullOrEmpty(text)) return;
 
         var sz = g.MeasureString(text, _weightFont);
-        float rx = mx - sz.Width  / 2f - 3;
-        float ry = my - sz.Height / 2f - 1;
+        float rx = mx - sz.Width  / 2f - 4;
+        float ry = my - sz.Height / 2f - 2;
 
-        using var bgBrush  = new SolidBrush(Color.FromArgb(225, 255, 255, 255));
-        using var txtBrush = new SolidBrush(Color.FromArgb(80, 80, 90));
-        g.FillRectangle(bgBrush, rx, ry, sz.Width + 6, sz.Height + 2);
-        g.DrawString(text, _weightFont, txtBrush, rx + 3, ry + 1);
+        // Flow labels: fondo arancione se flow > 0, altrimenti bianco
+        Color bgColor  = Color.FromArgb(230, 255, 255, 255);
+        Color txtColor = Color.FromArgb(70, 70, 80);
+
+        if (isFlowLabel)
+        {
+            var parts = text.Split('/');
+            bool hasFlow = parts.Length == 2 && double.TryParse(parts[0], out double f) && f > 0;
+            bgColor  = hasFlow
+                ? Color.FromArgb(230, 255, 165, 50)   // arancione per flow attivo
+                : Color.FromArgb(220, 240, 240, 255);  // blu chiaro per flow = 0
+            txtColor = hasFlow ? Color.FromArgb(120, 50, 0) : Color.FromArgb(50, 50, 120);
+        }
+
+        using var bgBrush  = new SolidBrush(bgColor);
+        using var txtBrush = new SolidBrush(txtColor);
+        g.FillRectangle(bgBrush, rx, ry, sz.Width + 8, sz.Height + 4);
+        g.DrawString(text, _weightFont, txtBrush, rx + 4, ry + 2);
     }
+
 
     // ─── Draw Nodes ────────────────────────────────────────────────────
 
