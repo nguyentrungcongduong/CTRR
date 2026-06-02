@@ -58,15 +58,16 @@ public partial class MainForm : Form
     private readonly Dictionary<string, Func<Graph, int, List<Core.Algorithms.Base.AlgorithmStep>>>
         _algorithms = new()
         {
-            ["BFS – Duyệt chiều rộng"]          = (g, s) => BFS.Run(g, s),
-            ["DFS – Duyệt chiều sâu"]            = (g, s) => DFS.Run(g, s),
-            ["Dijkstra – Đường đi ngắn nhất"]    = (g, s) => Dijkstra.Run(g, s),
-            ["Kiểm tra 2 phía (Bipartite)"]      = (g, _) => BipartiteChecker.Run(g),
-            ["Prim – Cây khung nhỏ nhất (MST)"]  = (g, s) => Prim.Run(g, s),
-            ["Kruskal – Cây khung nhỏ nhất"]     = (g, _) => Kruskal.Run(g),
-            ["Ford-Fulkerson – Luồng cực đại"]   = (g, s) =>
+            ["BFS – Duyệt chiều rộng"]              = (g, s) => BFS.Run(g, s),
+            ["DFS – Duyệt chiều sâu"]                = (g, s) => DFS.Run(g, s),
+            ["Dijkstra – Đường đi ngắn nhất"]        = (g, s) => Dijkstra.Run(g, s),
+            ["Kiểm tra 2 phía (Bipartite)"]          = (g, _) => BipartiteChecker.Run(g),
+            ["Prim – Cây khung nhỏ nhất (MST)"]      = (g, s) => Prim.Run(g, s),
+            ["Kruskal – Cây khung nhỏ nhất"]         = (g, _) => Kruskal.Run(g),
+            ["Ford-Fulkerson – Luồng cực đại"]       = (g, s) =>
                 FordFulkerson.Run(g, s, g.Nodes.LastOrDefault()?.Id ?? s),
-            ["Fleury – Đường/Chu trình Euler"]   = (g, s) => Fleury.Run(g, s),
+            ["Fleury – Đường/Chu trình Euler"]       = (g, s) => Fleury.Run(g, s),
+            ["Hierholzer – Chu trình Euler (O(E))"]  = (g, s) => Hierholzer.Run(g, s),
         };
 
     // ─── Constructor ───────────────────────────────────────────────────
