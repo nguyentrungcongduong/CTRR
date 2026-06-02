@@ -1007,26 +1007,6 @@ public partial class MainForm : Form
         return btn;
     }
 
-    // ─── Sample Graph ──────────────────────────────────────────────────
-
-    private void LoadSampleGraph()
-    {
-        _engine.Pause();
-        var g = new Graph { Directed = false };
-        int a = g.AddNode(200, 150); int b = g.AddNode(420, 100);
-        int c = g.AddNode(640, 150); int d = g.AddNode(200, 360);
-        int e = g.AddNode(420, 320); int f = g.AddNode(640, 360);
-        g.AddEdge(a, b, 4); g.AddEdge(a, d, 2); g.AddEdge(b, c, 5);
-        g.AddEdge(b, e, 3); g.AddEdge(c, f, 1); g.AddEdge(d, e, 6);
-        g.AddEdge(e, f, 7);
-
-        _btnDirected.Checked   = false;
-        _btnDirected.ForeColor = Color.White;
-        _canvas.RefreshGraph(g);
-        RefreshStartNodeCombo();
-        ResetAnimUI();
-        UpdateStatus();
-    }
     // ─── Keyboard Shortcuts ────────────────────────────────────────────
 
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
