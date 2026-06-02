@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Windows.Forms;
+using GraphApp.Core.Algorithms.Advanced;
 using GraphApp.Core.Algorithms.Properties;
 using GraphApp.Core.Algorithms.ShortestPath;
 using GraphApp.Core.Algorithms.Traversal;
@@ -61,6 +62,7 @@ public partial class MainForm : Form
             ["DFS – Duyệt chiều sâu"]         = (g, s) => DFS.Run(g, s),
             ["Dijkstra – Đường đi ngắn nhất"] = (g, s) => Dijkstra.Run(g, s),
             ["Kiểm tra 2 phía (Bipartite)"]  = (g, _) => BipartiteChecker.Run(g),
+            ["Prim – Cây khung nhỏ nhất (MST)"]= (g, s) => Prim.Run(g, s),
         };
 
     // ─── Constructor ───────────────────────────────────────────────────
