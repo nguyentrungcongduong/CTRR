@@ -208,10 +208,49 @@ public partial class MainForm : Form
             }
         };
 
-        var btnSample = MakeActionBtn("★  Đồ thị mẫu", "Tải lại đồ thị mẫu");
-        btnSample.Click += (_, _) => LoadSampleGraph();
+        // ── Dropdown "Đồ thị mẫu" với 5 mẫu ──────────────────────
+        var ddSample = new ToolStripDropDownButton("📚  Đồ thị mẫu")
+        {
+            ForeColor   = Color.White,
+            Font        = new Font("Segoe UI", 9f),
+            Padding     = new Padding(8, 2, 8, 2),
+            Margin      = new Padding(2, 0, 2, 0),
+            ShowDropDownArrow = true,
+            ToolTipText = "Tải một đồ thị mẫu có sẵn"
+        };
 
-        ts.Items.Add(new ToolStripLabel("  CHẾ ĐỘ:  ")
+        void AddSampleItem(string icon, string label, string desc, Action loader)
+        {
+            var item = new ToolStripMenuItem($"{icon}  {label}")
+            {
+                ToolTipText = desc,
+                Font = new Font("Segoe UI", 9f)
+            };
+            item.Click += (_, _) => loader();
+            ddSample.DropDownItems.Add(item);
+        }
+
+        AddSampleItem("🔵", "Vô hướng 6 đỉnh",
+            "BFS / DFS / Prim / Kruskal",
+            () => LoadSample(BuildUndirected6()));
+
+        AddSampleItem("🟡", "Có hướng có trọng số",
+            "Dijkstra / Ford-Fulkerson",
+            () => LoadSample(BuildDirectedWeighted()));
+
+        AddSampleItem("🟢", "2 Phía (Bipartite)",
+            "Kiểm tra Bipartite",
+            () => LoadSample(BuildBipartite()));
+
+        AddSampleItem("🟣", "Đường Euler",
+            "Fleury / Hierholzer — có đường Euler (2 bậc lẻ)",
+            () => LoadSample(BuildEulerPath()));
+
+        AddSampleItem("⚪", "Chu trình Euler",
+            "Fleury / Hierholzer — chu trình Euler (tất cả bậc chẵn)",
+            () => LoadSample(BuildEulerCircuit()));
+
+        ts.Items.Add(new ToolStripLabel("  CHẾĐỘ:  ")
             { ForeColor = Color.FromArgb(170, 170, 185), Font = new Font("Segoe UI", 8f) });
         ts.Items.Add(btnSelect);
         ts.Items.Add(btnAddNode);
@@ -220,7 +259,7 @@ public partial class MainForm : Form
         ts.Items.Add(new ToolStripSeparator());
         ts.Items.Add(btnDirected);
         ts.Items.Add(new ToolStripSeparator());
-        ts.Items.Add(btnSample);
+        ts.Items.Add(ddSample);
         ts.Items.Add(btnClear);
         ts.Items.Add(new ToolStripSeparator());
 
@@ -717,6 +756,159 @@ public partial class MainForm : Form
         var s when s.Contains("Hierholzer")  => "💡 Hierholzer: Đường/Chu trình Euler O(E) bằng stack. Chọn đỉnh bắt đầu.",
         _                                    => "💡 Chọn thuật toán và bấm ▶ Chạy."
     };
+
+    // ─── Sample Graphs ─────────────────────────────────────────────
+
+    /// <summary>Tải đồ thị mẫu lên canvas và reset UI.</summary>
+    private void LoadSample(Graph g)
+    {
+        _engine.Pause();
+        _suppressDirectedChange = true;
+        _btnDirected.Checked    = g.Directed;
+        _btnDirected.Text       = g.Directed ? "⇄  Có hướng ✓" : "⇄  Có hướng";
+        _btnDirected.ForeColor  = g.Directed ? Color.FromArgb(255, 200, 60) : Color.White;
+        _suppressDirectedChange = false;
+
+        _canvas.RefreshGraph(g);
+        RefreshStartNodeCombo();
+        ResetAnimUI();
+        UpdateStatus();
+        if (_repPanel.Visible) _repPanel.RefreshFromGraph(g);
+    }
+
+    // ── 1. Vô hướng 6 đỉnh — test BFS/DFS/Prim/Kruskal ────────────────
+    private static Graph BuildUndirected6()
+    {
+        //        B(4)  C(5)
+        //       /    \ /  \
+        //      A(2)   E(3)  F
+        //       \    / \  /
+        //        D(6)   --(7)--
+        var g = new Graph { Directed = false };
+        int a = g.AddNode(200, 160);   // A
+        int b = g.AddNode(400, 90);    // B
+        int c = g.AddNode(630, 90);    // C
+        int d = g.AddNode(200, 370);   // D
+        int e = g.AddNode(420, 320);   // E
+        int f = g.AddNode(630, 370);   // F
+
+        g.AddEdge(a, b, 4);
+        g.AddEdge(a, d, 2);
+        g.AddEdge(b, c, 5);
+        g.AddEdge(b, e, 3);
+        g.AddEdge(c, f, 1);
+        g.AddEdge(d, e, 6);
+        g.AddEdge(e, f, 7);
+        return g;
+    }
+
+    // ── 2. Có hướng có trọng số — test Dijkstra/Ford-Fulkerson ────────
+    private static Graph BuildDirectedWeighted()
+    {
+        //  S ←10→ A −8→ T
+        //  S →₇ B →₇ T
+        //  A →₃ B      (cross)
+        var g = new Graph { Directed = true };
+        int s = g.AddNode(120, 240);  // Source
+        int a = g.AddNode(340, 120);  // A
+        int b = g.AddNode(340, 370);  // B
+        int c = g.AddNode(560, 240);  // C
+        int t = g.AddNode(760, 240);  // Sink
+
+        // Flow network edges (weight = capacity)
+        g.AddEdge(s, a, 10);
+        g.AddEdge(s, b, 7);
+        g.AddEdge(a, c, 8);
+        g.AddEdge(a, b, 3);
+        g.AddEdge(b, c, 5);
+        g.AddEdge(c, t, 12);
+        g.AddEdge(b, t, 6);
+        return g;
+    }
+
+    // ── 3. 2 Phía (Bipartite) — test Bipartite checker ──────────────
+    private static Graph BuildBipartite()
+    {
+        // Nhóm A: 3 đỉnh bên trái
+        // Nhóm B: 3 đỉnh bên phải
+        // Chỉ có cạnh A↔B (không có cạnh trong cùng nhóm)
+        var g = new Graph { Directed = false };
+        int a1 = g.AddNode(160, 140);
+        int a2 = g.AddNode(160, 280);
+        int a3 = g.AddNode(160, 420);
+        int b1 = g.AddNode(560, 140);
+        int b2 = g.AddNode(560, 280);
+        int b3 = g.AddNode(560, 420);
+
+        g.AddEdge(a1, b1, 1); g.AddEdge(a1, b2, 1);
+        g.AddEdge(a2, b1, 1); g.AddEdge(a2, b3, 1);
+        g.AddEdge(a3, b2, 1); g.AddEdge(a3, b3, 1);
+        return g;
+    }
+
+    // ── 4. Đường Euler — 2 đỉnh bậc lẻ ─────────────────────────
+    private static Graph BuildEulerPath()
+    {
+        // Königsberg-style: bậc các đỉnh: A=3 B=3 C=2 D=2 E=2
+        // => 2 đỉnh bậc lẻ (A, B) => đường Euler A..B
+        var g = new Graph { Directed = false };
+        int a = g.AddNode(160, 240);   // bậc 3
+        int b = g.AddNode(620, 240);   // bậc 3
+        int c = g.AddNode(390, 120);   // bậc 2
+        int d = g.AddNode(390, 360);   // bậc 2
+        int e = g.AddNode(390, 240);   // bậc 4
+
+        g.AddEdge(a, c, 1);
+        g.AddEdge(a, d, 1);
+        g.AddEdge(a, e, 1);
+        g.AddEdge(c, b, 1);
+        g.AddEdge(d, b, 1);
+        g.AddEdge(e, b, 1);
+        g.AddEdge(c, d, 1);
+        return g;
+    }
+
+    // ── 5. Chu trình Euler — tất cả bậc chẵn ─────────────────────
+    private static Graph BuildEulerCircuit()
+    {
+        // Petersen-style: ngũ giác ngoài + sô giác trong
+        // Tất cả đỉnh bậc 4 => chu trình Euler
+        var g = new Graph { Directed = false };
+
+        // Vòng ngoài (pentagon)
+        int p1 = g.AddNode(390, 80);
+        int p2 = g.AddNode(620, 250);
+        int p3 = g.AddNode(530, 470);
+        int p4 = g.AddNode(250, 470);
+        int p5 = g.AddNode(160, 250);
+
+        // Vòng trong (pentagram)
+        int q1 = g.AddNode(390, 200);
+        int q2 = g.AddNode(490, 320);
+        int q3 = g.AddNode(440, 430);
+        int q4 = g.AddNode(340, 430);
+        int q5 = g.AddNode(290, 320);
+
+        // Cạnh ngoài
+        g.AddEdge(p1, p2, 1); g.AddEdge(p2, p3, 1);
+        g.AddEdge(p3, p4, 1); g.AddEdge(p4, p5, 1);
+        g.AddEdge(p5, p1, 1);
+
+        // Cạnh trong
+        g.AddEdge(q1, q3, 1); g.AddEdge(q3, q5, 1);
+        g.AddEdge(q5, q2, 1); g.AddEdge(q2, q4, 1);
+        g.AddEdge(q4, q1, 1);
+
+        // Cạnh nối ngoài-trong
+        g.AddEdge(p1, q1, 1); g.AddEdge(p2, q2, 1);
+        g.AddEdge(p3, q3, 1); g.AddEdge(p4, q4, 1);
+        g.AddEdge(p5, q5, 1);
+
+        return g;
+    }
+
+    // Tương thích ngược với code cũ gọi LoadSampleGraph()
+    private void LoadSampleGraph() => LoadSample(BuildUndirected6());
 
     private void SelectModeBtn(ToolStripButton active)
     {
