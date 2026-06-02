@@ -100,18 +100,20 @@ public partial class MainForm : Form
         // Nút hành động
         btnDirected = MakeActionButton("⇄  Có hướng", "Bật/tắt đồ thị có hướng");
         btnDirected.CheckOnClick = true;
-        btnDirected.CheckedChanged += (_, _) =>
+        // Fix CS1628: capture out param vào local variable trước khi dùng trong lambda
+        var directedBtn = btnDirected;
+        directedBtn.CheckedChanged += (_, _) =>
         {
             var g = _canvas.GetGraph();
             if (g.Edges.Count > 0)
             {
-                string msg = btnDirected.Checked
+                string msg = directedBtn.Checked
                     ? "Chuyển sang đồ thị có hướng. Giữ nguyên các cạnh hiện tại?"
                     : "Chuyển sang đồ thị vô hướng. Giữ nguyên các cạnh hiện tại?";
                 MessageBox.Show(msg, "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
-            g.Directed = btnDirected.Checked;
-            btnDirected.ForeColor = btnDirected.Checked ? Color.FromArgb(255, 180, 50) : Color.White;
+            g.Directed = directedBtn.Checked;
+            directedBtn.ForeColor = directedBtn.Checked ? Color.FromArgb(255, 180, 50) : Color.White;
             _canvas.Invalidate();
             UpdateStatus();
         };
