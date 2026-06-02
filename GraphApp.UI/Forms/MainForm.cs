@@ -115,8 +115,8 @@ public partial class MainForm : Form
         BackColor     = Color.FromArgb(245, 246, 250);
 
         // Font toàn app — cascade xuống tất cả controls
-        Font          = new Font("Segoe UI", 10f, FontStyle.Regular);
-        AutoScaleMode = AutoScaleMode.Dpi;
+        Font = new Font("Segoe UI", 10f, FontStyle.Regular);
+        // Lưu ý: KHÔNG dùng AutoScaleMode.Dpi vì gây reset CellStyle của DataGridView
 
         LoadSampleGraph();
         UpdateStatus();

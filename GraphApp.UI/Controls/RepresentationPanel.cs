@@ -115,10 +115,21 @@ public class RepresentationPanel : Panel
             BackgroundColor       = Color.FromArgb(28, 31, 38),
             GridColor             = Color.FromArgb(55, 60, 75),
             ForeColor             = Color.FromArgb(210, 215, 230),
+            // DefaultCellStyle: base fallback
             DefaultCellStyle      = { BackColor = Color.FromArgb(34, 37, 46),
                                       ForeColor = Color.FromArgb(210, 215, 230),
                                       SelectionBackColor = Color.FromArgb(60, 100, 160),
+                                      SelectionForeColor = Color.White,
                                       Font = new Font("Consolas", 9f) },
+            // RowsDefaultCellStyle: override visual-styles renderer (quan trọng cho dark mode)
+            RowsDefaultCellStyle           = { BackColor = Color.FromArgb(34, 37, 46),
+                                               ForeColor = Color.FromArgb(210, 215, 230),
+                                               SelectionBackColor = Color.FromArgb(60, 100, 160),
+                                               SelectionForeColor = Color.White },
+            AlternatingRowsDefaultCellStyle = { BackColor = Color.FromArgb(38, 42, 54),
+                                                ForeColor = Color.FromArgb(210, 215, 230),
+                                                SelectionBackColor = Color.FromArgb(65, 105, 165),
+                                                SelectionForeColor = Color.White },
             ColumnHeadersDefaultCellStyle = { BackColor = Color.FromArgb(45, 50, 65),
                                               ForeColor = Color.FromArgb(180, 200, 255),
                                               Font = new Font("Segoe UI", 9f, FontStyle.Bold) },
@@ -131,6 +142,7 @@ public class RepresentationPanel : Panel
             ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing,
             ColumnHeadersHeight   = 28
         };
+
 
         var applyBtn = MakeApplyBtn();
         applyBtn.Click += (_, _) => ApplyMatrix();
