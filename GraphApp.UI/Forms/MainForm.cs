@@ -116,7 +116,9 @@ public partial class MainForm : Form
         {
             RefreshStartNodeCombo();
             UpdateStatus();
-            // Sync RepresentationPanel
+            // Cập nhật nút Run: chỉ enable khi có đỉnh
+            if (_btnRun != null)
+                _btnRun.Enabled = _canvas.GetGraph().Nodes.Count > 0;
             if (_repPanel.Visible)
                 _repPanel.RefreshFromGraph(_canvas.GetGraph());
         };
@@ -350,7 +352,7 @@ public partial class MainForm : Form
         var panel = new Panel
         {
             Dock      = DockStyle.Bottom,
-            Height    = 130,
+            Height    = 148,
             BackColor = Color.FromArgb(30, 33, 40),
             Padding   = new Padding(10, 6, 10, 6)
         };
@@ -370,13 +372,24 @@ public partial class MainForm : Form
 
         _cmbAlgorithm = new ComboBox
         {
-            Width         = 210,
+            Width         = 220,
             DropDownStyle = ComboBoxStyle.DropDownList,
             Font          = new Font("Segoe UI", 9f),
             Margin        = new Padding(0, 0, 8, 0)
         };
         _cmbAlgorithm.Items.AddRange(_algorithms.Keys.ToArray<object>());
         _cmbAlgorithm.SelectedIndex = 0;
+        // Khi đổi thuật toán: reset animation + hiện gợi ý
+        _cmbAlgorithm.SelectedIndexChanged += (_, _) =>
+        {
+            _engine.Pause();
+            _canvas.ClearStep();
+            SetAnimButtonsEnabled(false);
+            _lblStep.Text  = "Bước: —";
+            string algo    = _cmbAlgorithm.SelectedItem?.ToString() ?? "";
+            _lblDesc.Text  = GetAlgorithmHint(algo);
+            _lblDesc.ForeColor = Color.FromArgb(150, 200, 255);
+        };
         row1.Controls.Add(_cmbAlgorithm);
 
         row1.Controls.Add(MakeLabel("Đỉnh bắt đầu:"));
@@ -404,6 +417,7 @@ public partial class MainForm : Form
         };
         _btnRun.FlatAppearance.BorderSize = 0;
         _btnRun.Click += OnRunClicked;
+        new ToolTip().SetToolTip(_btnRun, "Chạy thuật toán đã chọn [Enter]");
         row1.Controls.Add(_btnRun);
 
         // Separator
@@ -434,11 +448,11 @@ public partial class MainForm : Form
             Padding       = new Padding(0, 2, 0, 2)
         };
 
-        _btnFirst     = MakeAnimBtn("|◀", "Về đầu");
-        _btnPrev      = MakeAnimBtn("◀",  "Bước trước");
-        _btnNext      = MakeAnimBtn("▶",  "Bước sau");
-        _btnLast      = MakeAnimBtn("▶|", "Về cuối");
-        _btnPlayPause = MakeAnimBtn("⏵ Phát", "Phát/Tạm dừng", 90);
+        _btnFirst     = MakeAnimBtn("|◀", "Về bước đầu [Home]");
+        _btnPrev      = MakeAnimBtn("◀",  "Bước trước [←]");
+        _btnNext      = MakeAnimBtn("▶",  "Bước sau [→]");
+        _btnLast      = MakeAnimBtn("▶|", "Về bước cuối [End]");
+        _btnPlayPause = MakeAnimBtn("⏵ Phát", "Phát / Tạm dừng [Space]", 90);
 
         _btnFirst.Click     += (_, _) => { _engine.Pause(); _engine.GoToStart(); };
         _btnPrev.Click      += (_, _) => { _engine.Pause(); _engine.Prev(); };
@@ -452,11 +466,11 @@ public partial class MainForm : Form
         row2.Controls.Add(_btnLast);
         row2.Controls.Add(_btnPlayPause);
 
-        // Speed
+        // Speed: Chậm ← slider → Nhanh
         row2.Controls.Add(new Label
-            { Text = "  Tốc độ:", ForeColor = Color.FromArgb(160, 160, 175),
-              Font = new Font("Segoe UI", 8f), AutoSize = true,
-              Margin = new Padding(8, 6, 0, 0) });
+            { Text = "  🐢 Chậm", ForeColor = Color.FromArgb(140, 140, 160),
+              Font = new Font("Segoe UI", 7.5f), AutoSize = true,
+              Margin = new Padding(12, 7, 0, 0) });
 
         _trackSpeed = new TrackBar
         {
@@ -464,23 +478,28 @@ public partial class MainForm : Form
             Maximum    = 10,
             Value      = 5,
             TickStyle  = TickStyle.None,
-            Width      = 100,
+            Width      = 110,
             Height     = 28,
-            Margin     = new Padding(0, 4, 0, 0)
+            Margin     = new Padding(2, 4, 2, 0)
         };
         _trackSpeed.Scroll += (_, _) =>
         {
             int ms = SpeedToMs(_trackSpeed.Value);
             _engine.SetSpeed(ms);
-            _lblSpeedVal.Text = $"{ms}ms";
+            _lblSpeedVal.Text = SpeedLabel(_trackSpeed.Value);
         };
         row2.Controls.Add(_trackSpeed);
 
+        row2.Controls.Add(new Label
+            { Text = "Nhanh 🐇", ForeColor = Color.FromArgb(140, 140, 160),
+              Font = new Font("Segoe UI", 7.5f), AutoSize = true,
+              Margin = new Padding(0, 7, 8, 0) });
+
         _lblSpeedVal = new Label
         {
-            Text      = "800ms",
-            ForeColor = Color.FromArgb(160, 160, 175),
-            Font      = new Font("Segoe UI", 8f),
+            Text      = SpeedLabel(5),
+            ForeColor = Color.FromArgb(180, 200, 255),
+            Font      = new Font("Segoe UI", 8f, FontStyle.Bold),
             AutoSize  = true,
             Margin    = new Padding(2, 6, 0, 0)
         };
@@ -488,20 +507,20 @@ public partial class MainForm : Form
 
         panel.Controls.Add(row2);
 
-        // ── Hàng 3: Description ───────────────────────────────────────
+        // ── Hàng 3: Description (multiline) ─────────────────────────
         _lblDesc = new Label
         {
             Dock      = DockStyle.Fill,
-            Text      = "Chọn thuật toán và bấm ▶ Chạy để bắt đầu.",
-            ForeColor = Color.FromArgb(190, 190, 200),
-            Font      = new Font("Segoe UI", 8.5f, FontStyle.Italic),
+            Text      = GetAlgorithmHint(_cmbAlgorithm.SelectedItem?.ToString() ?? ""),
+            ForeColor = Color.FromArgb(150, 200, 255),
+            Font      = new Font("Segoe UI", 8.5f),
             TextAlign = ContentAlignment.MiddleLeft,
-            Padding   = new Padding(4, 0, 0, 0),
-            AutoEllipsis = true
+            Padding   = new Padding(6, 2, 0, 2),
+            AutoSize  = false
         };
         panel.Controls.Add(_lblDesc);
 
-        // Tắt các nút điều khiển ban đầu
+        // Tắt nút điều khiển ban đầu; Run disabled nếu graph rỗng
         SetAnimButtonsEnabled(false);
         return panel;
     }
@@ -510,19 +529,24 @@ public partial class MainForm : Form
 
     private void OnEngineStepChanged(Core.Algorithms.Base.AlgorithmStep step, int index, int total)
     {
-        // Cập nhật canvas
         _canvas.ApplyStep(step);
 
-        // Cập nhật UI
-        _lblStep.Text = $"Bước: {index}/{total}";
-        _lblDesc.Text = step.Description.Replace("\n", "  │  ");
-        _lblDesc.ForeColor = step.StepType == "done"
-            ? Color.FromArgb(100, 220, 130)
-            : step.StepType == "error"
-                ? Color.FromArgb(240, 100, 100)
-                : Color.FromArgb(200, 200, 215);
+        // Step counter nổi bật
+        _lblStep.Text = $"  🔢 Bước {index} / {total}";
 
-        // Cập nhật trạng thái nút
+        // Description: hiển thị như multiline
+        _lblDesc.Text = step.Description;
+        _lblDesc.ForeColor = step.StepType switch
+        {
+            "done"         => Color.FromArgb(100, 220, 130),
+            "error"        => Color.FromArgb(240, 100, 100),
+            "check_bridge" => Color.FromArgb(255, 220, 80),
+            "find_path"
+            or "augment_flow" => Color.FromArgb(255, 180, 80),
+            _              => Color.FromArgb(200, 210, 230)
+        };
+
+        // Enable/disable navigation
         _btnFirst.Enabled = _btnPrev.Enabled = !_engine.IsAtStart;
         _btnLast.Enabled  = _btnNext.Enabled = !_engine.IsAtEnd;
         _btnPlayPause.Text = _engine.IsPlaying ? "⏸ Dừng" : "⏵ Phát";
@@ -620,20 +644,25 @@ public partial class MainForm : Form
     private void UpdateStatus()
     {
         var g = _canvas.GetGraph();
-        _lblNodes.Text    = $"Đỉnh: {g.Nodes.Count}";
-        _lblEdges.Text    = $"Cạnh: {g.Edges.Count}";
-        _lblDirected.Text = g.Directed ? "Có hướng" : "Vô hướng";
+
+        // Tính bậc trung bình
+        double avgDeg = g.Nodes.Count > 0
+            ? g.Edges.Count * (g.Directed ? 1.0 : 2.0) / g.Nodes.Count : 0;
+
+        _lblNodes.Text    = $"📍 {g.Nodes.Count} đỉnh";
+        _lblEdges.Text    = $"🔗 {g.Edges.Count} cạnh";
+        _lblDirected.Text = g.Directed ? "⇄ Có hướng" : "— Vô hướng";
         _lblDirected.ForeColor = g.Directed
-            ? Color.FromArgb(255, 200, 80) : Color.FromArgb(200, 200, 200);
+            ? Color.FromArgb(255, 200, 80) : Color.FromArgb(180, 200, 220);
 
         string modeName = _canvas.Mode switch
         {
-            CanvasMode.AddNode => "Thêm đỉnh",
-            CanvasMode.AddEdge => "Thêm cạnh",
-            CanvasMode.Delete  => "Xóa",
-            _                  => "Chọn / Kéo thả"
+            CanvasMode.AddNode => "⊕ Thêm đỉnh",
+            CanvasMode.AddEdge => "→ Thêm cạnh",
+            CanvasMode.Delete  => "✕ Xóa",
+            _                  => "↖ Chọn/Kéo"
         };
-        _lblMode.Text = $"Chế độ: {modeName}   ";
+        _lblMode.Text = $"{modeName}   ";
     }
 
     // ─── Helpers ───────────────────────────────────────────────────────
@@ -665,6 +694,29 @@ public partial class MainForm : Form
     private static int SpeedToMs(int trackValue) =>
         // trackValue 1→10: 1=slow(2000ms), 10=fast(100ms)
         (int)(2000.0 / trackValue * 0.9 + 100);
+
+    private static string SpeedLabel(int v) => v switch
+    {
+        <= 2  => "⏱ Rất chậm",
+        <= 4  => "⏱ Chậm",
+        <= 6  => "⏱ Bình thường",
+        <= 8  => "⚡ Nhanh",
+        _     => "⚡ Rất nhanh"
+    };
+
+    private static string GetAlgorithmHint(string algo) => algo switch
+    {
+        var s when s.Contains("BFS")         => "💡 BFS: Duyệt theo chiều rộng (Queue). Chọn đỉnh bắt đầu.",
+        var s when s.Contains("DFS")         => "💡 DFS: Duyệt theo chiều sâu (Stack). Chọn đỉnh bắt đầu.",
+        var s when s.Contains("Dijkstra")    => "💡 Dijkstra: Đường ngắn nhất (đồ thị có trọng số ≥ 0). Chọn đỉnh nguồn.",
+        var s when s.Contains("Bipartite")   => "💡 Bipartite: Kiểm tra 2 phía bằng BFS tô màu. Không cần chọn đỉnh.",
+        var s when s.Contains("Prim")        => "💡 Prim: MST cho đồ thị VÔ HƯỚNG có trọng số. Chọn đỉnh bắt đầu.",
+        var s when s.Contains("Kruskal")     => "💡 Kruskal: MST bằng Union-Find. Không cần chọn đỉnh bắt đầu.",
+        var s when s.Contains("Ford")        => "💡 Ford-Fulkerson: Max Flow trên đồ thị CÓ HƯỚNG. Nguồn = đỉnh chọn, Đích = đỉnh cuối.",
+        var s when s.Contains("Fleury")      => "💡 Fleury: Đường/Chu trình Euler (có bridge detection). Chọn đỉnh bắt đầu.",
+        var s when s.Contains("Hierholzer")  => "💡 Hierholzer: Đường/Chu trình Euler O(E) bằng stack. Chọn đỉnh bắt đầu.",
+        _                                    => "💡 Chọn thuật toán và bấm ▶ Chạy."
+    };
 
     private void SelectModeBtn(ToolStripButton active)
     {
@@ -734,5 +786,37 @@ public partial class MainForm : Form
         RefreshStartNodeCombo();
         ResetAnimUI();
         UpdateStatus();
+    }
+    // ─── Keyboard Shortcuts ────────────────────────────────────────────
+
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+        // Bỏ qua khi đang nhập liệu vào TextBox / ComboBox
+        if (ActiveControl is TextBox or ComboBox or RichTextBox)
+            return base.ProcessCmdKey(ref msg, keyData);
+
+        switch (keyData)
+        {
+            case Keys.Space:
+                if (_engine.HasSteps) { OnPlayPauseClicked(null, EventArgs.Empty); return true; }
+                break;
+            case Keys.Left:
+                if (_btnPrev.Enabled) { _engine.Pause(); _engine.Prev(); return true; }
+                break;
+            case Keys.Right:
+                if (_btnNext.Enabled) { _engine.Pause(); _engine.Next(); return true; }
+                break;
+            case Keys.Home:
+                if (_btnFirst.Enabled) { _engine.Pause(); _engine.GoToStart(); return true; }
+                break;
+            case Keys.End:
+                if (_btnLast.Enabled) { _engine.Pause(); _engine.GoToEnd(); return true; }
+                break;
+            case Keys.Enter:
+                if (_btnRun.Enabled && !_engine.HasSteps)
+                { OnRunClicked(null, EventArgs.Empty); return true; }
+                break;
+        }
+        return base.ProcessCmdKey(ref msg, keyData);
     }
 }
