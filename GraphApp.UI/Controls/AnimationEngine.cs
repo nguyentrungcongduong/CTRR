@@ -12,7 +12,7 @@ public class AnimationEngine
     // ─── State ─────────────────────────────────────────────────────────
     private List<AlgorithmStep> _steps       = new();
     private int                  _currentIndex = -1;
-    private readonly Timer       _timer;
+    private readonly System.Windows.Forms.Timer _timer;
 
     // ─── Events ────────────────────────────────────────────────────────
     /// <summary>
@@ -37,7 +37,7 @@ public class AnimationEngine
     // ─── Constructor ───────────────────────────────────────────────────
     public AnimationEngine()
     {
-        _timer = new Timer { Interval = 800 };
+        _timer = new System.Windows.Forms.Timer { Interval = 800 };
         _timer.Tick += OnTimerTick;
     }
 
