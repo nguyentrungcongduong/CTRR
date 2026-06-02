@@ -50,6 +50,9 @@ public partial class MainForm : Form
     private Label           _lblDesc       = null!;
     private Label           _lblSpeedVal   = null!;
 
+    // Flag tránh vòng lặp khi hoàn tác toggle directed
+    private bool _suppressDirectedChange;
+
     // ─── Algorithm registry ────────────────────────────────────────────
     private readonly Dictionary<string, Func<Graph, int, List<Core.Algorithms.Base.AlgorithmStep>>>
         _algorithms = new()
@@ -139,16 +142,46 @@ public partial class MainForm : Form
         btnAddEdge = MakeModeBtn("→  Thêm cạnh", "Thêm cạnh",        CanvasMode.AddEdge);
         btnDelete  = MakeModeBtn("✕  Xóa",       "Xóa đỉnh/cạnh",   CanvasMode.Delete);
 
-        btnDirected = MakeActionBtn("⇄  Có hướng", "Bật/tắt đồ thị có hướng");
+        btnDirected = MakeActionBtn("⇄  Có hướng", "Bật/tắt đồ thị có hướng (directed / undirected)");
         btnDirected.CheckOnClick = true;
         var dirBtn = btnDirected;
         dirBtn.CheckedChanged += (_, _) =>
         {
+            if (_suppressDirectedChange) return;
+
             var g = _canvas.GetGraph();
-            g.Directed         = dirBtn.Checked;
-            dirBtn.ForeColor   = dirBtn.Checked ? Color.FromArgb(255, 180, 50) : Color.White;
+
+            // Cảnh báo nếu đang có cạnh
+            if (g.Edges.Count > 0)
+            {
+                string newMode = dirBtn.Checked ? "CÓ HƯỚNG" : "VÔ HƯỚNG";
+                string oldMode = dirBtn.Checked ? "vô hướng"  : "có hướng";
+                var ans = MessageBox.Show(
+                    $"Chuyển đồ thị từ {oldMode} → {newMode}.\n\n" +
+                    $"Các cạnh hiện tại ({g.Edges.Count} cạnh) sẽ được GIỮ NGUYÊN.\n" +
+                    "Bạn có muốn tiếp tục không?",
+                    "Xác nhận chuyển đổi",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question);
+
+                if (ans == DialogResult.No)
+                {
+                    // Hoàn tác toggle mà không kích hoạt lại event
+                    _suppressDirectedChange = true;
+                    dirBtn.Checked          = !dirBtn.Checked;
+                    _suppressDirectedChange = false;
+                    return;
+                }
+            }
+
+            g.Directed       = dirBtn.Checked;
+            dirBtn.Text      = dirBtn.Checked ? "⇄  Có hướng ✓" : "⇄  Có hướng";
+            dirBtn.ForeColor = dirBtn.Checked ? Color.FromArgb(255, 200, 60) : Color.White;
             _canvas.Invalidate();
             UpdateStatus();
+
+            if (_repPanel.Visible)
+                _repPanel.RefreshFromGraph(_canvas.GetGraph());
         };
 
         var btnClear = MakeActionBtn("🗑  Xóa tất cả", "Xóa toàn bộ đồ thị");
