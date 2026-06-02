@@ -143,6 +143,32 @@ public class GraphCanvas : UserControl
         Invalidate();
     }
 
+    /// <summary>
+    /// Xuất canvas hiện tại ra Bitmap (không có UI hints, chỉ đồ thị).
+    /// scaleFactor = 2 → xuất 2× độ phân giải màn hình.
+    /// </summary>
+    public Bitmap ExportToBitmap(int scaleFactor = 2)
+    {
+        int w = Math.Max(1, Width  * scaleFactor);
+        int h = Math.Max(1, Height * scaleFactor);
+        var bmp = new Bitmap(w, h);
+        using var g = System.Drawing.Graphics.FromImage(bmp);
+        g.SmoothingMode     = SmoothingMode.AntiAlias;
+        g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+        g.ScaleTransform(scaleFactor, scaleFactor);
+
+        // Background (screen-space, nhân scaleFactor)
+        DrawBackground(g);
+
+        // Đồ thị (world-space)
+        g.TranslateTransform(_panOffset.X, _panOffset.Y);
+        g.ScaleTransform(_zoom, _zoom);
+        DrawEdges(g);
+        DrawNodes(g);
+
+        return bmp;
+    }
+
     // ─── OnPaint ───────────────────────────────────────────────────────
 
     protected override void OnPaint(PaintEventArgs e)

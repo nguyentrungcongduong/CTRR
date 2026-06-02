@@ -29,6 +29,13 @@ public static class GraphSerializer
     /// </summary>
     public static void Save(Graph graph, string filePath)
     {
+        var json = SerializeToString(graph);
+        File.WriteAllText(filePath, json, System.Text.Encoding.UTF8);
+    }
+
+    /// <summary>Serialize đồ thị thành chuỗi JSON (dùng cho Undo/Redo).</summary>
+    public static string SerializeToString(Graph graph)
+    {
         var dto = new GraphDto
         {
             Version  = 1,
@@ -48,9 +55,7 @@ public static class GraphSerializer
                 Weight = e.Weight
             }).ToList()
         };
-
-        var json = JsonSerializer.Serialize(dto, _options);
-        File.WriteAllText(filePath, json, System.Text.Encoding.UTF8);
+        return JsonSerializer.Serialize(dto, _options);
     }
 
     // ─── Load ─────────────────────────────────────────────────────────
@@ -63,9 +68,14 @@ public static class GraphSerializer
     public static Graph? Load(string filePath)
     {
         if (!File.Exists(filePath)) return null;
-
         var json = File.ReadAllText(filePath, System.Text.Encoding.UTF8);
-        var dto  = JsonSerializer.Deserialize<GraphDto>(json, _options);
+        return DeserializeFromString(json);
+    }
+
+    /// <summary>Deserialize chuỗi JSON thành Graph (dùng cho Undo/Redo).</summary>
+    public static Graph? DeserializeFromString(string json)
+    {
+        var dto = JsonSerializer.Deserialize<GraphDto>(json, _options);
         if (dto?.Nodes == null || dto.Edges == null) return null;
 
         var graph = new Graph { Directed = dto.Directed };
@@ -84,7 +94,6 @@ public static class GraphSerializer
         // Restore edges trực tiếp
         foreach (var e in dto.Edges)
         {
-            // Chỉ thêm cạnh hợp lệ (source/target phải tồn tại)
             bool srcOk = graph.Nodes.Any(n => n.Id == e.Source);
             bool tgtOk = graph.Nodes.Any(n => n.Id == e.Target);
             if (!srcOk || !tgtOk) continue;
@@ -98,9 +107,8 @@ public static class GraphSerializer
             });
         }
 
-        // ⚠️ Quan trọng: cập nhật lại bộ đếm Id để tránh conflict khi thêm mới
+        // ⚠️ Quan trọng: cập nhật lại bộ đếm Id
         graph.RestoreCountersFromData();
-
         return graph;
     }
 

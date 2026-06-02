@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Drawing.Imaging;
 using System.Windows.Forms;
 using GraphApp.Core.Algorithms.Advanced;
 using GraphApp.Core.Algorithms.Properties;
@@ -31,6 +32,10 @@ public partial class MainForm : Form
     private readonly ToolStripButton _btnDelete;
     private readonly ToolStripButton _btnDirected;
 
+    // Undo / Redo toolbar buttons (cần ref để enable/disable)
+    private ToolStripButton _btnUndo = null!;
+    private ToolStripButton _btnRedo = null!;
+
     // Status labels
     private readonly ToolStripStatusLabel _lblNodes;
     private readonly ToolStripStatusLabel _lblEdges;
@@ -53,6 +58,12 @@ public partial class MainForm : Form
 
     // Flag tránh vòng lặp khi hoàn tác toggle directed
     private bool _suppressDirectedChange;
+
+    // ─── Undo / Redo history ─────────────────────────────────────────
+    private const int MaxHistory = 50;
+    private readonly List<string> _history = new();
+    private int  _historyIndex  = -1;
+    private bool _isRestoring   = false;
 
     // ─── Algorithm registry ────────────────────────────────────────────
     private readonly Dictionary<string, Func<Graph, int, List<Core.Algorithms.Base.AlgorithmStep>>>
@@ -112,11 +123,13 @@ public partial class MainForm : Form
     private GraphCanvas BuildCanvas()
     {
         var c = new GraphCanvas { Dock = DockStyle.Fill };
-        c.GraphChanged += _ =>
+        c.GraphChanged += graph =>
         {
+            // Undo/Redo: đẩy trạng thái mới vào history
+            if (!_isRestoring) PushHistory(graph);
+
             RefreshStartNodeCombo();
             UpdateStatus();
-            // Cập nhật nút Run: chỉ enable khi có đỉnh
             if (_btnRun != null)
                 _btnRun.Enabled = _canvas.GetGraph().Nodes.Count > 0;
             if (_repPanel.Visible)
@@ -259,6 +272,19 @@ public partial class MainForm : Form
         ts.Items.Add(new ToolStripSeparator());
         ts.Items.Add(btnDirected);
         ts.Items.Add(new ToolStripSeparator());
+
+        // Undo / Redo
+        _btnUndo = MakeActionBtn("↩  Hoàn tác", "Hoàn tác thao tác vừa rồi [Ctrl+Z]");
+        _btnUndo.Click   += (_, _) => DoUndo();
+        _btnUndo.Enabled  = false;
+        ts.Items.Add(_btnUndo);
+
+        _btnRedo = MakeActionBtn("↪  Làm lại", "Làm lại thao tác đã hoàn tác [Ctrl+Y]");
+        _btnRedo.Click   += (_, _) => DoRedo();
+        _btnRedo.Enabled  = false;
+        ts.Items.Add(_btnRedo);
+
+
         ts.Items.Add(ddSample);
         ts.Items.Add(btnClear);
 
@@ -370,6 +396,12 @@ public partial class MainForm : Form
             }
         };
         ts.Items.Add(btnMatrix);
+
+        // Export PNG
+        var btnExport = MakeActionBtn("📷  Xuất PNG", "Xuất đồ thị ra file PNG (2× độ phân giải) [Ctrl+E]");
+        btnExport.Click += (_, _) => ExportPng();
+        ts.Items.Add(btnExport);
+        ts.Items.Add(new ToolStripSeparator());
 
         SelectModeBtn(btnSelect);
         return ts;
@@ -785,6 +817,11 @@ public partial class MainForm : Form
         ResetAnimUI();
         UpdateStatus();
         if (_repPanel.Visible) _repPanel.RefreshFromGraph(g);
+
+        // Đẩy trạng thái ban đầu vào history (clear history trước)
+        _history.Clear();
+        _historyIndex = -1;
+        PushHistory(g);
     }
 
     // ── 1. Vô hướng 6 đỉnh — test BFS/DFS/Prim/Kruskal ────────────────
@@ -1021,12 +1058,111 @@ public partial class MainForm : Form
                 break;
             case Keys.F:
                 _canvas.FitToScreen();
-                return true;
             case Keys.Control | Keys.D0:
             case Keys.Control | Keys.NumPad0:
                 _canvas.ResetView();
                 return true;
+            // Undo / Redo / Export
+            case Keys.Control | Keys.Z:
+                DoUndo(); return true;
+            case Keys.Control | Keys.Y:
+                DoRedo(); return true;
+            case Keys.Control | Keys.E:
+                ExportPng(); return true;
         }
         return base.ProcessCmdKey(ref msg, keyData);
+    }
+
+    // ─── Undo / Redo ───────────────────────────────────────────────────
+
+    private void PushHistory(Graph g)
+    {
+        // Xóa future history khi có action mới
+        if (_historyIndex < _history.Count - 1)
+            _history.RemoveRange(_historyIndex + 1, _history.Count - _historyIndex - 1);
+
+        _history.Add(GraphSerializer.SerializeToString(g));
+        _historyIndex = _history.Count - 1;
+
+        // Giới hạn bộ nhớ
+        if (_history.Count > MaxHistory)
+        {
+            _history.RemoveAt(0);
+            _historyIndex = _history.Count - 1;
+        }
+        UpdateUndoRedoButtons();
+    }
+
+    private void DoUndo()
+    {
+        if (_historyIndex <= 0) return;
+        _historyIndex--;
+        RestoreHistoryState(_history[_historyIndex]);
+    }
+
+    private void DoRedo()
+    {
+        if (_historyIndex >= _history.Count - 1) return;
+        _historyIndex++;
+        RestoreHistoryState(_history[_historyIndex]);
+    }
+
+    private void RestoreHistoryState(string json)
+    {
+        var g = GraphSerializer.DeserializeFromString(json);
+        if (g == null) return;
+
+        _isRestoring = true;
+        try
+        {
+            _suppressDirectedChange = true;
+            _btnDirected.Checked    = g.Directed;
+            _btnDirected.Text       = g.Directed ? "⇄  Có hướng ✓" : "⇄  Có hướng";
+            _btnDirected.ForeColor  = g.Directed ? Color.FromArgb(255, 200, 60) : Color.White;
+            _suppressDirectedChange = false;
+
+            _engine.Pause();
+            _canvas.RefreshGraph(g);
+            _canvas.ClearStep();
+            RefreshStartNodeCombo();
+            ResetAnimUI();
+            UpdateStatus();
+            if (_repPanel.Visible) _repPanel.RefreshFromGraph(g);
+        }
+        finally { _isRestoring = false; }
+
+        UpdateUndoRedoButtons();
+    }
+
+    private void UpdateUndoRedoButtons()
+    {
+        if (_btnUndo != null) _btnUndo.Enabled = _historyIndex > 0;
+        if (_btnRedo != null) _btnRedo.Enabled = _historyIndex < _history.Count - 1;
+    }
+
+    // ─── Export PNG ────────────────────────────────────────────────────
+
+    private void ExportPng()
+    {
+        using var dlg = new SaveFileDialog
+        {
+            Title      = "Xuất đồ thị ra PNG",
+            Filter     = "PNG Image (*.png)|*.png|All files (*.*)|*.*",
+            DefaultExt = "png",
+            FileName   = "graph_export"
+        };
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+        try
+        {
+            using var bmp = _canvas.ExportToBitmap(scaleFactor: 2);
+            bmp.Save(dlg.FileName, System.Drawing.Imaging.ImageFormat.Png);
+            _lblMode.Text = $"✓ Đã xuất: {Path.GetFileName(dlg.FileName)} ({bmp.Width}×{bmp.Height}px)   ";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Không thể xuất PNG:\n{ex.Message}",
+                "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
     }
 }
