@@ -58,11 +58,12 @@ public partial class MainForm : Form
     private readonly Dictionary<string, Func<Graph, int, List<Core.Algorithms.Base.AlgorithmStep>>>
         _algorithms = new()
         {
-            ["BFS – Duyệt chiều rộng"]       = (g, s) => BFS.Run(g, s),
-            ["DFS – Duyệt chiều sâu"]         = (g, s) => DFS.Run(g, s),
-            ["Dijkstra – Đường đi ngắn nhất"] = (g, s) => Dijkstra.Run(g, s),
-            ["Kiểm tra 2 phía (Bipartite)"]  = (g, _) => BipartiteChecker.Run(g),
+            ["BFS – Duyệt chiều rộng"]        = (g, s) => BFS.Run(g, s),
+            ["DFS – Duyệt chiều sâu"]          = (g, s) => DFS.Run(g, s),
+            ["Dijkstra – Đường đi ngắn nhất"]  = (g, s) => Dijkstra.Run(g, s),
+            ["Kiểm tra 2 phía (Bipartite)"]    = (g, _) => BipartiteChecker.Run(g),
             ["Prim – Cây khung nhỏ nhất (MST)"]= (g, s) => Prim.Run(g, s),
+            ["Kruskal – Cây khung nhỏ nhất"]   = (g, _) => Kruskal.Run(g),
         };
 
     // ─── Constructor ───────────────────────────────────────────────────
