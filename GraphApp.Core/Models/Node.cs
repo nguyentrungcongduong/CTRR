@@ -13,4 +13,7 @@ public class Node
 
     /// <summary>Tọa độ của đỉnh trên canvas (đơn vị: pixel).</summary>
     public System.Drawing.PointF Position { get; set; }
+
+    /// <summary>Hiển thị nhãn trong ComboBox và các control khác.</summary>
+    public override string ToString() => Label;
 }
