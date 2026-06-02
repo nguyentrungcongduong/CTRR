@@ -114,6 +114,10 @@ public partial class MainForm : Form
         WindowState   = FormWindowState.Maximized;
         BackColor     = Color.FromArgb(245, 246, 250);
 
+        // Font toàn app — cascade xuống tất cả controls
+        Font          = new Font("Segoe UI", 10f, FontStyle.Regular);
+        AutoScaleMode = AutoScaleMode.Dpi;
+
         LoadSampleGraph();
         UpdateStatus();
     }
@@ -699,18 +703,25 @@ public partial class MainForm : Form
         out ToolStripStatusLabel lblMode,
         out ToolStripStatusLabel lblDirected)
     {
+        var statusFont = new Font("Segoe UI", 9.5f);
+
         var ss = new StatusStrip
         {
             BackColor  = Color.FromArgb(40, 44, 52),
             ForeColor  = Color.White,
-            SizingGrip = false
+            SizingGrip = false,
+            Font       = statusFont
         };
 
-        lblNodes    = new ToolStripStatusLabel("Đỉnh: 0")     { ForeColor = Color.FromArgb(180, 220, 255) };
-        lblEdges    = new ToolStripStatusLabel("Cạnh: 0")     { ForeColor = Color.FromArgb(180, 220, 255) };
-        lblDirected = new ToolStripStatusLabel("Vô hướng")    { ForeColor = Color.FromArgb(200, 200, 200) };
+        lblNodes    = new ToolStripStatusLabel("Đỉnh: 0")
+            { ForeColor = Color.FromArgb(180, 220, 255), Font = statusFont };
+        lblEdges    = new ToolStripStatusLabel("Cạnh: 0")
+            { ForeColor = Color.FromArgb(180, 220, 255), Font = statusFont };
+        lblDirected = new ToolStripStatusLabel("Vô hướng")
+            { ForeColor = Color.FromArgb(200, 200, 200), Font = statusFont };
         lblMode     = new ToolStripStatusLabel("Chế độ: Chọn")
-            { ForeColor = Color.FromArgb(180, 255, 180), Spring = true, TextAlign = ContentAlignment.MiddleRight };
+            { ForeColor = Color.FromArgb(180, 255, 180), Spring = true,
+              TextAlign = ContentAlignment.MiddleRight, Font = statusFont };
 
         ss.Items.Add(new ToolStripStatusLabel("  "));
         ss.Items.Add(lblNodes);
@@ -973,8 +984,8 @@ public partial class MainForm : Form
         var btn = new ToolStripButton(text)
         {
             ToolTipText = tooltip, AutoSize = true,
-            ForeColor   = Color.White, Font = new Font("Segoe UI", 9f),
-            Padding     = new Padding(8, 2, 8, 2), Margin = new Padding(2, 0, 2, 0)
+            ForeColor   = Color.White, Font = new Font("Segoe UI", 9.5f),
+            Padding     = new Padding(10, 3, 10, 3), Margin = new Padding(2, 0, 2, 0)
         };
         btn.Click += (_, _) => { _canvas.Mode = mode; SelectModeBtn(btn); UpdateStatus(); };
         return btn;
@@ -982,7 +993,7 @@ public partial class MainForm : Form
 
     private static ToolStripButton MakeActionBtn(string text, string tooltip) =>
         new(text) { ToolTipText = tooltip, AutoSize = true, ForeColor = Color.White,
-                    Font = new Font("Segoe UI", 9f), Padding = new Padding(8, 2, 8, 2),
+                    Font = new Font("Segoe UI", 9.5f), Padding = new Padding(10, 3, 10, 3),
                     Margin = new Padding(2, 0, 2, 0) };
 
     private static Label MakeLabel(string text) => new()

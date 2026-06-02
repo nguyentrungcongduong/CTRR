@@ -15,8 +15,8 @@ namespace GraphApp.UI.Controls;
 /// </summary>
 public class GraphCanvas : UserControl
 {
-    // ─── Constants ─────────────────────────────────────────────────────
-    public  const float NodeRadius   = 22f;
+    // ─── Constants ──────────────────────────────────────────────────
+    public  const float NodeRadius   = 24f;    // tăng từ 22 lên 24 — rõ hơn trên màn hình 1080p+
     private const float EdgeClickTol = 6f;
 
     // ─── Color palette (theo ARCHITECTURE.md) ──────────────────────────
@@ -32,10 +32,10 @@ public class GraphCanvas : UserControl
     private static readonly Color CBackground     = Color.FromArgb(245, 246, 250);
     private static readonly Color CGrid           = Color.FromArgb(232, 232, 238);
 
-    // ─── Fonts ─────────────────────────────────────────────────────────
-    private readonly Font _nodeFont   = new("Segoe UI", 10f, FontStyle.Bold);
-    private readonly Font _weightFont = new("Segoe UI", 7.5f);
-    private readonly Font _secFont    = new("Segoe UI", 7.5f);
+    // ─── Fonts ──────────────────────────────────────────────────
+    private readonly Font _nodeFont   = new("Segoe UI", 11f, FontStyle.Bold);   // tăng từ 10 lên 11
+    private readonly Font _weightFont = new("Segoe UI",  9f, FontStyle.Bold);   // tăng từ 7.5 lên 9 bold
+    private readonly Font _secFont    = new("Segoe UI",  8.5f);                 // tăng từ 7.5 lên 8.5
 
     // ─── State ─────────────────────────────────────────────────
     private Graph          _graph       = new();
@@ -313,7 +313,8 @@ public class GraphCanvas : UserControl
 
         using var bgBrush  = new SolidBrush(bgColor);
         using var txtBrush = new SolidBrush(txtColor);
-        g.FillRectangle(bgBrush, rx, ry, sz.Width + 8, sz.Height + 4);
+        // Rounded rect padding lớn hơn — chữ không bị lẫn vào đường kẻ
+        g.FillRectangle(bgBrush, rx - 1, ry, sz.Width + 10, sz.Height + 4);
         g.DrawString(text, _weightFont, txtBrush, rx + 4, ry + 2);
     }
 
