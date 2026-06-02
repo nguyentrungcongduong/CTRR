@@ -177,6 +177,17 @@ public class Graph
         _nextEdgeId = 1;
     }
 
+    /// <summary>
+    /// Tính lại bộ đếm Id từ dữ liệu hiện tại.
+    /// Gọi sau khi restore trực tiếp Nodes/Edges (e.g. deserialization)
+    /// để tránh Id conflict khi thêm node/edge mới.
+    /// </summary>
+    public void RestoreCountersFromData()
+    {
+        _nextNodeId = Nodes.Count > 0 ? Nodes.Max(n => n.Id) + 1 : 1;
+        _nextEdgeId = Edges.Count > 0 ? Edges.Max(e => e.Id) + 1 : 1;
+    }
+
     // ─── Private helpers ───────────────────────────────────────────────
 
     /// <summary>

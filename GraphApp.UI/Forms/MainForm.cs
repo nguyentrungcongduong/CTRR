@@ -4,6 +4,7 @@ using GraphApp.Core.Algorithms.Properties;
 using GraphApp.Core.Algorithms.ShortestPath;
 using GraphApp.Core.Algorithms.Traversal;
 using GraphApp.Core.Models;
+using GraphApp.Core.Persistence;
 using GraphApp.UI.Controls;
 
 namespace GraphApp.UI.Forms;
@@ -179,6 +180,73 @@ public partial class MainForm : Form
         ts.Items.Add(new ToolStripSeparator());
         ts.Items.Add(btnSample);
         ts.Items.Add(btnClear);
+        ts.Items.Add(new ToolStripSeparator());
+
+        // ── Save / Load ────────────────────────────────────────────────
+        var btnSave = MakeActionBtn("💾  Lưu", "Lưu đồ thị ra file .graph.json");
+        btnSave.Click += (_, _) =>
+        {
+            using var dlg = new SaveFileDialog
+            {
+                Title            = "Lưu đồ thị",
+                Filter           = GraphSerializer.FileFilter,
+                DefaultExt       = "graph.json",
+                AddExtension     = true,
+                FileName         = "graph"
+            };
+            if (dlg.ShowDialog(this) == DialogResult.OK)
+            {
+                try
+                {
+                    GraphSerializer.Save(_canvas.GetGraph(), dlg.FileName);
+                    _lblMode.Text = $"✓ Đã lưu: {Path.GetFileName(dlg.FileName)}";
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Không thể lưu file:\n{ex.Message}",
+                        "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        };
+
+        var btnLoad = MakeActionBtn("📂  Mở", "Mở file đồ thị .graph.json");
+        btnLoad.Click += (_, _) =>
+        {
+            using var dlg = new OpenFileDialog
+            {
+                Title  = "Mở đồ thị",
+                Filter = GraphSerializer.FileFilter
+            };
+            if (dlg.ShowDialog(this) == DialogResult.OK)
+            {
+                try
+                {
+                    var loaded = GraphSerializer.Load(dlg.FileName);
+                    if (loaded == null)
+                    {
+                        MessageBox.Show("File không hợp lệ hoặc rỗng.",
+                            "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+                    _engine.Pause();
+                    _canvas.RefreshGraph(loaded);
+                    _btnDirected.Checked = loaded.Directed;
+                    RefreshStartNodeCombo();
+                    ResetAnimUI();
+                    UpdateStatus();
+                    if (_repPanel.Visible) _repPanel.RefreshFromGraph(_canvas.GetGraph());
+                    _lblMode.Text = $"✓ Đã mở: {Path.GetFileName(dlg.FileName)}";
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Không thể mở file:\n{ex.Message}",
+                        "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        };
+
+        ts.Items.Add(btnSave);
+        ts.Items.Add(btnLoad);
         ts.Items.Add(new ToolStripSeparator());
 
         // Toggle RepresentationPanel
