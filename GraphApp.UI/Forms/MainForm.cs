@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Windows.Forms;
+using GraphApp.Core.Algorithms.ShortestPath;
 using GraphApp.Core.Algorithms.Traversal;
 using GraphApp.Core.Models;
 using GraphApp.UI.Controls;
@@ -50,8 +51,9 @@ public partial class MainForm : Form
     private readonly Dictionary<string, Func<Graph, int, List<Core.Algorithms.Base.AlgorithmStep>>>
         _algorithms = new()
         {
-            ["BFS – Duyệt chiều rộng"] = (g, s) => BFS.Run(g, s),
-            ["DFS – Duyệt chiều sâu"]  = (g, s) => DFS.Run(g, s),
+            ["BFS – Duyệt chiều rộng"]       = (g, s) => BFS.Run(g, s),
+            ["DFS – Duyệt chiều sâu"]         = (g, s) => DFS.Run(g, s),
+            ["Dijkstra – Đường đi ngắn nhất"] = (g, s) => Dijkstra.Run(g, s),
         };
 
     // ─── Constructor ───────────────────────────────────────────────────
