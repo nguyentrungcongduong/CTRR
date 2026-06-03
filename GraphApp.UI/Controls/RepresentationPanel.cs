@@ -10,7 +10,7 @@ namespace GraphApp.UI.Controls;
 /// Panel bên phải: hiển thị đồ thị dưới 3 dạng biểu diễn.
 /// Tab 1 — Ma Trận Kề  : DataGridView (có thể chỉnh sửa)
 /// Tab 2 — Danh Sách Kề: RichTextBox (có thể chỉnh sửa)
-/// Tab 3 — Danh Sách Cạnh: ListView 3 cột (có thể chỉnh sửa)
+/// Tab 3 — Danh Sách Cạnh: DataGridView 3 cột (double-click để sửa)
 /// Nút "Áp dụng" → parse ngược → gọi event GraphApplied(newGraph).
 /// </summary>
 public class RepresentationPanel : Panel
@@ -34,7 +34,7 @@ public class RepresentationPanel : Panel
     private readonly RichTextBox  _rtb;
 
     // Tab 3: Danh Sách Cạnh
-    private readonly ListView     _lv;
+    private readonly DataGridView _dgvEdge;   // thành DataGridView — double-click để sửa
 
     // ─── Constructor ───────────────────────────────────────────────────
     public RepresentationPanel()
@@ -66,13 +66,13 @@ public class RepresentationPanel : Panel
             Padding    = new System.Drawing.Point(10, 4)
         };
 
-        var (tab1, dgv)  = BuildMatrixTab();
-        var (tab2, rtb)  = BuildAdjListTab();
-        var (tab3, lv)   = BuildEdgeListTab();
+        var (tab1, dgv)      = BuildMatrixTab();
+        var (tab2, rtb)      = BuildAdjListTab();
+        var (tab3, edgeDgv)  = BuildEdgeListTab();
 
-        _dgv = dgv;
-        _rtb = rtb;
-        _lv  = lv;
+        _dgv     = dgv;
+        _rtb     = rtb;
+        _dgvEdge = edgeDgv;
 
         _tabs.TabPages.Add(tab1);
         _tabs.TabPages.Add(tab2);
@@ -323,7 +323,7 @@ public class RepresentationPanel : Panel
 
     // ─── Tab 3: Danh Sách Cạnh ────────────────────────────────────────
 
-    private (TabPage, ListView) BuildEdgeListTab()
+    private (TabPage, DataGridView) BuildEdgeListTab()
     {
         var tab = new TabPage("Danh Sách Cạnh")
         {
@@ -331,24 +331,48 @@ public class RepresentationPanel : Panel
             Padding   = new Padding(6)
         };
 
-        var lv = new ListView
+        // DataGridView — 3 cột sửa được toàn bộ
+        var dgv = new DataGridView
         {
-            Dock           = DockStyle.Fill,
-            View           = View.Details,
-            FullRowSelect  = true,
-            GridLines      = true,
-            LabelEdit      = true,
-            BackColor      = Color.FromArgb(28, 31, 38),
-            ForeColor      = Color.FromArgb(210, 220, 245),
-            Font           = new Font("Consolas", 9f),
-            BorderStyle    = BorderStyle.None,
-            HeaderStyle    = ColumnHeaderStyle.Nonclickable
+            Dock      = DockStyle.Fill,
+            BackgroundColor       = Color.FromArgb(28, 31, 38),
+            GridColor             = Color.FromArgb(55, 60, 75),
+            ForeColor             = Color.FromArgb(210, 215, 230),
+            DefaultCellStyle      = { BackColor = Color.FromArgb(34, 37, 46),
+                                      ForeColor = Color.FromArgb(210, 220, 245),
+                                      SelectionBackColor = Color.FromArgb(60, 100, 160),
+                                      SelectionForeColor = Color.White,
+                                      Font = new Font("Consolas", 9.5f) },
+            RowsDefaultCellStyle  = { BackColor = Color.FromArgb(34, 37, 46),
+                                      ForeColor = Color.FromArgb(210, 220, 245),
+                                      SelectionBackColor = Color.FromArgb(60, 100, 160),
+                                      SelectionForeColor = Color.White },
+            AlternatingRowsDefaultCellStyle = { BackColor = Color.FromArgb(38, 42, 54),
+                                                ForeColor = Color.FromArgb(210, 220, 245),
+                                                SelectionBackColor = Color.FromArgb(65, 105, 165),
+                                                SelectionForeColor = Color.White },
+            ColumnHeadersDefaultCellStyle = { BackColor = Color.FromArgb(45, 50, 65),
+                                              ForeColor = Color.FromArgb(180, 200, 255),
+                                              Font = new Font("Segoe UI", 9f, FontStyle.Bold),
+                                              Alignment = DataGridViewContentAlignment.MiddleCenter },
+            RowHeadersVisible     = false,
+            AllowUserToAddRows    = false,   // dùng nút riêng
+            AllowUserToDeleteRows = false,
+            BorderStyle           = BorderStyle.None,
+            EnableHeadersVisualStyles = false,
+            ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing,
+            ColumnHeadersHeight   = 28,
+            EditMode              = DataGridViewEditMode.EditOnKeystrokeOrF2,
+            SelectionMode         = DataGridViewSelectionMode.FullRowSelect
         };
-        lv.Columns.Add("Nguồn",  100);
-        lv.Columns.Add("Đích",   100);
-        lv.Columns.Add("Trọng số", 80);
+        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name="src", HeaderText="Nguồn", Width=100 });
+        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name="tgt", HeaderText="Đích",   Width=100 });
+        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name="w",   HeaderText="Trọng số", Width=90  });
+        dgv.Columns[0].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+        dgv.Columns[1].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+        dgv.Columns[2].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
 
-        // Add row button
+        // + Thêm cạnh — thêm hàng trống, tự focus vào edit
         var addRow = new Button
         {
             Text      = "+ Thêm cạnh",
@@ -362,13 +386,14 @@ public class RepresentationPanel : Panel
         addRow.FlatAppearance.BorderSize = 0;
         addRow.Click += (_, _) =>
         {
-            var item = new ListViewItem("A");
-            item.SubItems.Add("B");
-            item.SubItems.Add("1");
-            lv.Items.Add(item);
+            int idx = dgv.Rows.Add("A", "B", "1");
+            dgv.ClearSelection();
+            dgv.Rows[idx].Selected = true;
+            dgv.CurrentCell = dgv.Rows[idx].Cells[0];
+            dgv.BeginEdit(true);    // bắt đầu sửa ngay
         };
 
-        // Delete row button
+        // − Xóa cạnh — xóa hàng đang chọn
         var delRow = new Button
         {
             Text      = "− Xóa cạnh",
@@ -382,81 +407,73 @@ public class RepresentationPanel : Panel
         delRow.FlatAppearance.BorderSize = 0;
         delRow.Click += (_, _) =>
         {
-            foreach (ListViewItem sel in lv.SelectedItems) sel.Remove();
+            var toDelete = dgv.SelectedRows.Cast<DataGridViewRow>().ToList();
+            foreach (var row in toDelete)
+                if (!row.IsNewRow) dgv.Rows.Remove(row);
         };
 
         var applyBtn = MakeApplyBtn();
         applyBtn.Click += (_, _) => ApplyEdgeList();
 
-        tab.Controls.Add(lv);
+        tab.Controls.Add(dgv);
         tab.Controls.Add(addRow);
         tab.Controls.Add(delRow);
         tab.Controls.Add(applyBtn);
-        return (tab, lv);
+        return (tab, dgv);
     }
 
     private void RefreshEdgeList()
     {
         if (_graph == null) return;
-        _lv.Items.Clear();
+        _dgvEdge.Rows.Clear();
         foreach (var (src, tgt, w) in GraphConverter.ToEdgeList(_graph))
-        {
-            var item = new ListViewItem(src);
-            item.SubItems.Add(tgt);
-            item.SubItems.Add(FormatW(w));
-            _lv.Items.Add(item);
-        }
+            _dgvEdge.Rows.Add(src, tgt, FormatW(w));
     }
 
     private void ApplyEdgeList()
     {
         if (_graph == null) return;
 
-        // Parse tất cả hàng từ ListView
+        // Commit ô đang edit trước khi parse
+        if (_dgvEdge.IsCurrentCellInEditMode)
+            _dgvEdge.EndEdit();
+
+        // Parse tất cả hàng từ DataGridView
         var rows = new List<(string Src, string Tgt, double W)>();
-        foreach (ListViewItem item in _lv.Items)
+        foreach (DataGridViewRow row in _dgvEdge.Rows)
         {
-            string src = item.Text.Trim();
-            string tgt = item.SubItems.Count > 1 ? item.SubItems[1].Text.Trim() : "";
-            double w   = item.SubItems.Count > 2
-                && double.TryParse(item.SubItems[2].Text, out double d) ? d : 1.0;
+            if (row.IsNewRow) continue;
+            string src = row.Cells["src"].Value?.ToString()?.Trim() ?? "";
+            string tgt = row.Cells["tgt"].Value?.ToString()?.Trim() ?? "";
+            string wStr = row.Cells["w"].Value?.ToString() ?? "1";
+            double w = double.TryParse(wStr, out double d) ? d : 1.0;
             if (!string.IsNullOrWhiteSpace(src) && !string.IsNullOrWhiteSpace(tgt) && src != tgt)
                 rows.Add((src, tgt, w));
         }
 
-        // Clone graph hiện tại — GIỮ VỊ TRÍ NODE (không tạo graph mới từ đầu)
+        // Clone graph hiện tại — GIỮ VỊ TRÍ NODE
         var newGraph = _graph.Clone();
-
-        // Build bảng nhãn → nodeId từ graph clone
         var labelToId = newGraph.Nodes.ToDictionary(n => n.Label, n => n.Id);
-
-        // Xóa tất cả edges cũ, rồi add lại từ ListView
         newGraph.Edges.Clear();
 
-        var addedEdges = new HashSet<(int, int)>();   // dedup cho vô hướng
-
+        var addedEdges = new HashSet<(int, int)>();
         foreach (var (srcLabel, tgtLabel, weight) in rows)
         {
-            // Tìm hoặc tạo node nguồn
             if (!labelToId.TryGetValue(srcLabel, out int srcId))
             {
                 srcId = newGraph.AddNode(300, 300, srcLabel);
                 labelToId[srcLabel] = srcId;
             }
-            // Tìm hoặc tạo node đích
             if (!labelToId.TryGetValue(tgtLabel, out int tgtId))
             {
                 tgtId = newGraph.AddNode(450, 300, tgtLabel);
                 labelToId[tgtLabel] = tgtId;
             }
-
-            // Với đồ thị vô hướng: bỏ qua cạnh trùng (A-B == B-A)
             if (!newGraph.Directed)
             {
                 int lo = Math.Min(srcId, tgtId), hi = Math.Max(srcId, tgtId);
                 if (!addedEdges.Add((lo, hi))) continue;
             }
-
             newGraph.AddEdge(srcId, tgtId, weight);
         }
 
