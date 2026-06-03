@@ -98,14 +98,12 @@ public partial class MainForm : Form
         // Người dùng có thể kéo divider lên/xuống để thay đổi kích thước
         var splitMain = new SplitContainer
         {
-            Dock             = DockStyle.Fill,
-            Orientation      = Orientation.Horizontal,
-            SplitterWidth    = 6,
-            SplitterDistance = 999,        // sẽ tính lại sau khi Load
-            Panel1MinSize    = 150,
-            Panel2MinSize    = 110,
-            BackColor        = Color.FromArgb(50, 54, 66),  // màu splitter handle
-            Cursor           = Cursors.SizeNS               // ↕ gọn hơn HSplit mặc định
+            Dock          = DockStyle.Fill,
+            Orientation   = Orientation.Horizontal,
+            SplitterWidth = 6,
+            Panel1MinSize = 150,
+            Panel2MinSize = 110,
+            BackColor     = Color.FromArgb(50, 54, 66)   // màu splitter strip
         };
 
         // Panel1: Canvas + RepPanel
@@ -113,22 +111,28 @@ public partial class MainForm : Form
         _repPanel.Dock = DockStyle.Right;
         splitMain.Panel1.Controls.Add(_canvas);
         splitMain.Panel1.Controls.Add(_repPanel);
+        // Cursor mặc định trên panel1 (không kéo nhầm)
+        splitMain.Panel1.Cursor = Cursors.Default;
 
         // Panel2: AnimPanel (fill trong panel2)
         _animPanel.Dock = DockStyle.Fill;
         splitMain.Panel2.Controls.Add(_animPanel);
+        splitMain.Panel2.Cursor = Cursors.Default;
 
         // Thứ tự Add vào Form:
         Controls.Add(splitMain);        // Fill (giữa toolbar và status bar)
         Controls.Add(_toolbar);         // Top
         Controls.Add(_statusBar);       // Bottom (outermost)
 
-        // Sau khi form load, đặt splitter = chiều cao - 210 để panel2 cao ~210px
-        Load += (_, _) =>
+        // Dùng Shown (sau khi Maximized layout xong) để set SplitterDistance đúng
+        // Panel2 cao ~220px, Panel1 = phần còn lại
+        Shown += (_, _) =>
         {
-            int target = ClientSize.Height - _toolbar.Height - _statusBar.Height - 210;
-            if (target > splitMain.Panel1MinSize)
-                splitMain.SplitterDistance = target;
+            int availH = splitMain.Height;
+            int panel2Target = 220;
+            int dist = availH - panel2Target - splitMain.SplitterWidth;
+            if (dist >= splitMain.Panel1MinSize && dist <= availH - splitMain.Panel2MinSize)
+                splitMain.SplitterDistance = dist;
         };
 
         // Engine events
