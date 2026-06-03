@@ -411,17 +411,56 @@ public class RepresentationPanel : Panel
     private void ApplyEdgeList()
     {
         if (_graph == null) return;
-        var edgeList = new List<(string, string, double)>();
+
+        // Parse tất cả hàng từ ListView
+        var rows = new List<(string Src, string Tgt, double W)>();
         foreach (ListViewItem item in _lv.Items)
         {
-            string src = item.Text;
-            string tgt = item.SubItems.Count > 1 ? item.SubItems[1].Text : "";
+            string src = item.Text.Trim();
+            string tgt = item.SubItems.Count > 1 ? item.SubItems[1].Text.Trim() : "";
             double w   = item.SubItems.Count > 2
                 && double.TryParse(item.SubItems[2].Text, out double d) ? d : 1.0;
-            if (!string.IsNullOrWhiteSpace(src) && !string.IsNullOrWhiteSpace(tgt))
-                edgeList.Add((src, tgt, w));
+            if (!string.IsNullOrWhiteSpace(src) && !string.IsNullOrWhiteSpace(tgt) && src != tgt)
+                rows.Add((src, tgt, w));
         }
-        GraphApplied?.Invoke(GraphConverter.FromEdgeList(edgeList, _graph.Directed));
+
+        // Clone graph hiện tại — GIỮ VỊ TRÍ NODE (không tạo graph mới từ đầu)
+        var newGraph = _graph.Clone();
+
+        // Build bảng nhãn → nodeId từ graph clone
+        var labelToId = newGraph.Nodes.ToDictionary(n => n.Label, n => n.Id);
+
+        // Xóa tất cả edges cũ, rồi add lại từ ListView
+        newGraph.Edges.Clear();
+
+        var addedEdges = new HashSet<(int, int)>();   // dedup cho vô hướng
+
+        foreach (var (srcLabel, tgtLabel, weight) in rows)
+        {
+            // Tìm hoặc tạo node nguồn
+            if (!labelToId.TryGetValue(srcLabel, out int srcId))
+            {
+                srcId = newGraph.AddNode(300, 300, srcLabel);
+                labelToId[srcLabel] = srcId;
+            }
+            // Tìm hoặc tạo node đích
+            if (!labelToId.TryGetValue(tgtLabel, out int tgtId))
+            {
+                tgtId = newGraph.AddNode(450, 300, tgtLabel);
+                labelToId[tgtLabel] = tgtId;
+            }
+
+            // Với đồ thị vô hướng: bỏ qua cạnh trùng (A-B == B-A)
+            if (!newGraph.Directed)
+            {
+                int lo = Math.Min(srcId, tgtId), hi = Math.Max(srcId, tgtId);
+                if (!addedEdges.Add((lo, hi))) continue;
+            }
+
+            newGraph.AddEdge(srcId, tgtId, weight);
+        }
+
+        GraphApplied?.Invoke(newGraph);
     }
 
     // ─── Helpers ───────────────────────────────────────────────────────
