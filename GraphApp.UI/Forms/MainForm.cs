@@ -656,12 +656,32 @@ public partial class MainForm : Form
         return panel;
     }
 
-    // Helper: cập nhật rtbDesc text + màu
+    // Helper: append step desc vào RichTextBox (log-style, màu theo step type)
     private void SetDescText(string text, Color color)
     {
         if (_rtbDesc == null) { _lblDesc.Text = text; return; }
-        _rtbDesc.ForeColor = color;
-        _rtbDesc.Text      = text;
+
+        // Append với màu — dùng SelectionColor của RichTextBox
+        _rtbDesc.SuspendLayout();
+        int start = _rtbDesc.TextLength;
+        _rtbDesc.AppendText(text + "\n");
+        _rtbDesc.Select(start, text.Length);
+        _rtbDesc.SelectionColor = color;
+        _rtbDesc.SelectionLength = 0;            // bỏ selection
+        _rtbDesc.SelectionStart  = _rtbDesc.TextLength;
+        _rtbDesc.ResumeLayout();
+        _rtbDesc.ScrollToCaret();                // cuộn xuống dòng mới nhất
+    }
+
+    // Xóa log khi bắt đầu thuật toán mới
+    private void ClearDescLog(string hint)
+    {
+        if (_rtbDesc == null) return;
+        _rtbDesc.Clear();
+        // Hiện gợi ý thuật toán với màu hint
+        _rtbDesc.SelectionColor = Color.FromArgb(100, 140, 200);
+        _rtbDesc.AppendText(hint + "\n");
+        _rtbDesc.SelectionStart = _rtbDesc.TextLength;
     }
 
     // ─── Engine Event Handlers ─────────────────────────────────────────
@@ -717,6 +737,9 @@ public partial class MainForm : Form
                 "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
+
+        // Xóa log cũ, hiện tên thuật toán
+        ClearDescLog($"▶  {algoName}");
 
         // Chạy thuật toán
         _engine.Pause();
