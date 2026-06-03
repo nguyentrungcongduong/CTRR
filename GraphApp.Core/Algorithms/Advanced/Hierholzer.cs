@@ -216,16 +216,31 @@ public class Hierholzer : IGraphAlgorithm
             if (oddNodes.Count == 0)
             {
                 int start = nodesWithEdges.Contains(requestedStart) ? requestedStart : nodesWithEdges.First();
+                string degStr = string.Join(", ", degree
+                    .Where(kv => nodesWithEdges.Contains(kv.Key))
+                    .Select(kv => $"{graph.GetNode(kv.Key)?.Label}={kv.Value}"));
                 return (true, EulerType.Circuit, start,
-                    "✅ CHU TRÌNH EULER — tất cả đỉnh có bậc chẵn.\n" +
-                    $"  Bậc: {string.Join(", ", degree.Where(kv => nodesWithEdges.Contains(kv.Key)).Select(kv => $"{graph.GetNode(kv.Key)?.Label}={kv.Value}"))}" );
+                    $"✅ CHU TRÌNH EULER — tất cả đỉnh có bậc chẵn.\n" +
+                    $"  Bắt đầu từ: {graph.GetNode(start)?.Label}\n" +
+                    $"  Bậc: {degStr}");
             }
             if (oddNodes.Count == 2)
             {
+                string oddLabels = string.Join(", ",
+                    oddNodes.Select(id => graph.GetNode(id)?.Label ?? "?"));
+
                 int start = oddNodes.Contains(requestedStart) ? requestedStart : oddNodes[0];
+                string startLabel = graph.GetNode(start)?.Label ?? "?";
+
+                // Giải thích nếu user chọn đỉnh bậc chẵn (không hợp lệ làm điểm đầu Euler path)
+                string overrideNote = oddNodes.Contains(requestedStart) ? "" :
+                    $"\n  ⚠️ Đỉnh '{graph.GetNode(requestedStart)?.Label}' có bậc CHẴN — không thể làm điểm đầu đường Euler.\n" +
+                    $"  Tự động chuyển sang đỉnh '{startLabel}' (bậc lẻ).";
+
                 return (true, EulerType.Path, start,
-                    "✅ ĐƯỜNG EULER — 2 đỉnh bậc lẻ.\n" +
-                    $"  Bắt đầu từ: {graph.GetNode(start)?.Label}");
+                    $"✅ ĐƯỜNG EULER — 2 đỉnh bậc lẻ: {oddLabels}.\n" +
+                    $"  Đường Euler PHẢI bắt đầu từ đỉnh bậc lẻ.\n" +
+                    $"  Bắt đầu từ: {startLabel}" + overrideNote);
             }
             return (false, EulerType.Circuit, requestedStart,
                 $"❌ {oddNodes.Count} đỉnh có bậc lẻ — không tồn tại đường Euler.");
