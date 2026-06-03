@@ -53,7 +53,8 @@ public partial class MainForm : Form
     private Button          _btnLast       = null!;
     private Button          _btnPlayPause  = null!;
     private TrackBar        _trackSpeed    = null!;
-    private Label           _lblDesc       = null!;
+    private Label           _lblDesc       = null!;    // kept for compat (hidden)
+    private RichTextBox     _rtbDesc       = null!;    // actual description display
     private Label           _lblSpeedVal   = null!;
 
     // Flag tránh vòng lặp khi hoàn tác toggle directed
@@ -438,16 +439,16 @@ public partial class MainForm : Form
         var panel = new Panel
         {
             Dock      = DockStyle.Bottom,
-            Height    = 148,
+            Height    = 200,                         // 148 → 200
             BackColor = Color.FromArgb(30, 33, 40),
-            Padding   = new Padding(10, 6, 10, 6)
+            Padding   = new Padding(10, 6, 10, 4)
         };
 
         // ── Hàng 1: Chọn thuật toán + chạy + step counter ────────────
         var row1 = new FlowLayoutPanel
         {
             Dock          = DockStyle.Top,
-            Height        = 38,
+            Height        = 40,
             FlowDirection = FlowDirection.LeftToRight,
             WrapContents  = false,
             BackColor     = Color.Transparent,
@@ -458,14 +459,13 @@ public partial class MainForm : Form
 
         _cmbAlgorithm = new ComboBox
         {
-            Width         = 220,
+            Width         = 230,
             DropDownStyle = ComboBoxStyle.DropDownList,
-            Font          = new Font("Segoe UI", 9f),
+            Font          = new Font("Segoe UI", 9.5f),
             Margin        = new Padding(0, 0, 8, 0)
         };
         _cmbAlgorithm.Items.AddRange(_algorithms.Keys.ToArray<object>());
         _cmbAlgorithm.SelectedIndex = 0;
-        // Khi đổi thuật toán: reset animation + hiện gợi ý
         _cmbAlgorithm.SelectedIndexChanged += (_, _) =>
         {
             _engine.Pause();
@@ -473,8 +473,7 @@ public partial class MainForm : Form
             SetAnimButtonsEnabled(false);
             _lblStep.Text  = "Bước: —";
             string algo    = _cmbAlgorithm.SelectedItem?.ToString() ?? "";
-            _lblDesc.Text  = GetAlgorithmHint(algo);
-            _lblDesc.ForeColor = Color.FromArgb(150, 200, 255);
+            SetDescText(GetAlgorithmHint(algo), Color.FromArgb(150, 200, 255));
         };
         row1.Controls.Add(_cmbAlgorithm);
 
@@ -484,7 +483,7 @@ public partial class MainForm : Form
         {
             Width         = 80,
             DropDownStyle = ComboBoxStyle.DropDownList,
-            Font          = new Font("Segoe UI", 9f),
+            Font          = new Font("Segoe UI", 9.5f),
             Margin        = new Padding(0, 0, 8, 0)
         };
         row1.Controls.Add(_cmbStartNode);
@@ -492,12 +491,12 @@ public partial class MainForm : Form
         _btnRun = new Button
         {
             Text      = "▶  Chạy",
-            Width     = 90,
-            Height    = 28,
+            Width     = 95,
+            Height    = 30,
             BackColor = Color.FromArgb(46, 160, 67),
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
-            Font      = new Font("Segoe UI", 9f, FontStyle.Bold),
+            Font      = new Font("Segoe UI", 9.5f, FontStyle.Bold),
             Cursor    = Cursors.Hand,
             Margin    = new Padding(0, 0, 16, 0)
         };
@@ -506,7 +505,6 @@ public partial class MainForm : Form
         new ToolTip().SetToolTip(_btnRun, "Chạy thuật toán đã chọn [Enter]");
         row1.Controls.Add(_btnRun);
 
-        // Separator
         row1.Controls.Add(new Label
             { Text = "│", ForeColor = Color.FromArgb(80, 80, 90),
               Width = 10, TextAlign = ContentAlignment.MiddleCenter });
@@ -515,9 +513,9 @@ public partial class MainForm : Form
         {
             Text      = "Bước: —",
             ForeColor = Color.FromArgb(200, 200, 210),
-            Font      = new Font("Segoe UI", 9f, FontStyle.Bold),
+            Font      = new Font("Segoe UI", 9.5f, FontStyle.Bold),
             AutoSize  = true,
-            Margin    = new Padding(8, 4, 0, 0)
+            Margin    = new Padding(8, 5, 0, 0)
         };
         row1.Controls.Add(_lblStep);
 
@@ -527,7 +525,7 @@ public partial class MainForm : Form
         var row2 = new FlowLayoutPanel
         {
             Dock          = DockStyle.Top,
-            Height        = 38,
+            Height        = 42,
             FlowDirection = FlowDirection.LeftToRight,
             WrapContents  = false,
             BackColor     = Color.Transparent,
@@ -538,7 +536,7 @@ public partial class MainForm : Form
         _btnPrev      = MakeAnimBtn("◀",  "Bước trước [←]");
         _btnNext      = MakeAnimBtn("▶",  "Bước sau [→]");
         _btnLast      = MakeAnimBtn("▶|", "Về bước cuối [End]");
-        _btnPlayPause = MakeAnimBtn("⏵ Phát", "Phát / Tạm dừng [Space]", 90);
+        _btnPlayPause = MakeAnimBtn("⏵ Phát", "Phát / Tạm dừng [Space]", 95);
 
         _btnFirst.Click     += (_, _) => { _engine.Pause(); _engine.GoToStart(); };
         _btnPrev.Click      += (_, _) => { _engine.Pause(); _engine.Prev(); };
@@ -552,11 +550,10 @@ public partial class MainForm : Form
         row2.Controls.Add(_btnLast);
         row2.Controls.Add(_btnPlayPause);
 
-        // Speed: Chậm ← slider → Nhanh
         row2.Controls.Add(new Label
             { Text = "  🐢 Chậm", ForeColor = Color.FromArgb(140, 140, 160),
-              Font = new Font("Segoe UI", 7.5f), AutoSize = true,
-              Margin = new Padding(12, 7, 0, 0) });
+              Font = new Font("Segoe UI", 8f), AutoSize = true,
+              Margin = new Padding(12, 9, 0, 0) });
 
         _trackSpeed = new TrackBar
         {
@@ -564,9 +561,9 @@ public partial class MainForm : Form
             Maximum    = 10,
             Value      = 5,
             TickStyle  = TickStyle.None,
-            Width      = 110,
+            Width      = 120,
             Height     = 28,
-            Margin     = new Padding(2, 4, 2, 0)
+            Margin     = new Padding(2, 5, 2, 0)
         };
         _trackSpeed.Scroll += (_, _) =>
         {
@@ -578,37 +575,64 @@ public partial class MainForm : Form
 
         row2.Controls.Add(new Label
             { Text = "Nhanh 🐇", ForeColor = Color.FromArgb(140, 140, 160),
-              Font = new Font("Segoe UI", 7.5f), AutoSize = true,
-              Margin = new Padding(0, 7, 8, 0) });
+              Font = new Font("Segoe UI", 8f), AutoSize = true,
+              Margin = new Padding(0, 9, 8, 0) });
 
         _lblSpeedVal = new Label
         {
             Text      = SpeedLabel(5),
             ForeColor = Color.FromArgb(180, 200, 255),
-            Font      = new Font("Segoe UI", 8f, FontStyle.Bold),
+            Font      = new Font("Segoe UI", 9f, FontStyle.Bold),
             AutoSize  = true,
-            Margin    = new Padding(2, 6, 0, 0)
+            Margin    = new Padding(2, 8, 0, 0)
         };
         row2.Controls.Add(_lblSpeedVal);
 
         panel.Controls.Add(row2);
 
-        // ── Hàng 3: Description (multiline) ─────────────────────────
-        _lblDesc = new Label
+        // ── Hàng 3: Description — RichTextBox to, ro hon ─────────────
+        // Wrapper panel với viền nổi bật
+        var descWrapper = new Panel
         {
             Dock      = DockStyle.Fill,
-            Text      = GetAlgorithmHint(_cmbAlgorithm.SelectedItem?.ToString() ?? ""),
-            ForeColor = Color.FromArgb(150, 200, 255),
-            Font      = new Font("Segoe UI", 8.5f),
-            TextAlign = ContentAlignment.MiddleLeft,
-            Padding   = new Padding(6, 2, 0, 2),
-            AutoSize  = false
+            BackColor = Color.FromArgb(22, 26, 34),
+            Padding   = new Padding(1)
         };
-        panel.Controls.Add(_lblDesc);
 
-        // Tắt nút điều khiển ban đầu; Run disabled nếu graph rỗng
+        _lblDesc = new Label    // giữ field _lblDesc nhưng ẩn đi, dùng _rtbDesc để hiện
+        {
+            Visible = false
+        };
+
+        var rtbDesc = new RichTextBox
+        {
+            Dock        = DockStyle.Fill,
+            ReadOnly    = true,
+            BackColor   = Color.FromArgb(22, 26, 34),
+            ForeColor   = Color.FromArgb(200, 215, 245),
+            Font        = new Font("Segoe UI", 10f),
+            BorderStyle = BorderStyle.None,
+            ScrollBars  = RichTextBoxScrollBars.Vertical,
+            WordWrap    = true,
+            Padding     = new Padding(8, 4, 8, 4),
+            Text        = GetAlgorithmHint(_cmbAlgorithm.SelectedItem?.ToString() ?? "")
+        };
+        _rtbDesc = rtbDesc;   // lưu ref vào field mới
+
+        descWrapper.Controls.Add(rtbDesc);
+        panel.Controls.Add(descWrapper);
+        panel.Controls.Add(_lblDesc);   // hidden, giữ để code cũ không lỗi
+
         SetAnimButtonsEnabled(false);
         return panel;
+    }
+
+    // Helper: cập nhật rtbDesc text + màu
+    private void SetDescText(string text, Color color)
+    {
+        if (_rtbDesc == null) { _lblDesc.Text = text; return; }
+        _rtbDesc.ForeColor = color;
+        _rtbDesc.Text      = text;
     }
 
     // ─── Engine Event Handlers ─────────────────────────────────────────
@@ -620,17 +644,17 @@ public partial class MainForm : Form
         // Step counter nổi bật
         _lblStep.Text = $"  🔢 Bước {index} / {total}";
 
-        // Description: hiển thị như multiline
-        _lblDesc.Text = step.Description;
-        _lblDesc.ForeColor = step.StepType switch
+        // Description qua RichTextBox — to, ro, scroll được
+        Color descColor = step.StepType switch
         {
             "done"         => Color.FromArgb(100, 220, 130),
             "error"        => Color.FromArgb(240, 100, 100),
             "check_bridge" => Color.FromArgb(255, 220, 80),
             "find_path"
             or "augment_flow" => Color.FromArgb(255, 180, 80),
-            _              => Color.FromArgb(200, 210, 230)
+            _              => Color.FromArgb(200, 215, 245)
         };
+        SetDescText(step.Description, descColor);
 
         // Enable/disable navigation
         _btnFirst.Enabled = _btnPrev.Enabled = !_engine.IsAtStart;
