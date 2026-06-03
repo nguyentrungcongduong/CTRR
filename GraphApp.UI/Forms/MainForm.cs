@@ -94,12 +94,41 @@ public partial class MainForm : Form
         _statusBar = BuildStatusBar(out _lblNodes, out _lblEdges, out _lblMode, out _lblDirected);
         _repPanel  = BuildRepresentationPanel();
 
-        // Thứ tự Add quyết định vị trí Dock:
-        Controls.Add(_canvas);      // Fill
-        Controls.Add(_repPanel);    // Right — thêm trước toolbar để toolbar ưu tiên
-        Controls.Add(_toolbar);     // Top
-        Controls.Add(_animPanel);   // Bottom
-        Controls.Add(_statusBar);   // Bottom (outermost)
+        // ── SplitContainer ngang: Panel1 = Canvas, Panel2 = AnimPanel ──
+        // Người dùng có thể kéo divider lên/xuống để thay đổi kích thước
+        var splitMain = new SplitContainer
+        {
+            Dock             = DockStyle.Fill,
+            Orientation      = Orientation.Horizontal,
+            SplitterWidth    = 6,
+            SplitterDistance = 999,        // sẽ tính lại sau khi Load
+            Panel1MinSize    = 150,
+            Panel2MinSize    = 110,
+            BackColor        = Color.FromArgb(50, 54, 66)  // màu splitter handle
+        };
+
+        // Panel1: Canvas + RepPanel
+        _canvas.Dock   = DockStyle.Fill;
+        _repPanel.Dock = DockStyle.Right;
+        splitMain.Panel1.Controls.Add(_canvas);
+        splitMain.Panel1.Controls.Add(_repPanel);
+
+        // Panel2: AnimPanel (fill trong panel2)
+        _animPanel.Dock = DockStyle.Fill;
+        splitMain.Panel2.Controls.Add(_animPanel);
+
+        // Thứ tự Add vào Form:
+        Controls.Add(splitMain);        // Fill (giữa toolbar và status bar)
+        Controls.Add(_toolbar);         // Top
+        Controls.Add(_statusBar);       // Bottom (outermost)
+
+        // Sau khi form load, đặt splitter = chiều cao - 210 để panel2 cao ~210px
+        Load += (_, _) =>
+        {
+            int target = ClientSize.Height - _toolbar.Height - _statusBar.Height - 210;
+            if (target > splitMain.Panel1MinSize)
+                splitMain.SplitterDistance = target;
+        };
 
         // Engine events
         _engine.OnStepChanged += OnEngineStepChanged;
@@ -438,8 +467,7 @@ public partial class MainForm : Form
     {
         var panel = new Panel
         {
-            Dock      = DockStyle.Bottom,
-            Height    = 200,                         // 148 → 200
+            Dock      = DockStyle.Fill,   // SplitContainer.Panel2 manages size
             BackColor = Color.FromArgb(30, 33, 40),
             Padding   = new Padding(10, 6, 10, 4)
         };
