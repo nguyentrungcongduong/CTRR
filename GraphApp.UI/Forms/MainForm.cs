@@ -104,7 +104,8 @@ public partial class MainForm : Form
             SplitterDistance = 999,        // sẽ tính lại sau khi Load
             Panel1MinSize    = 150,
             Panel2MinSize    = 110,
-            BackColor        = Color.FromArgb(50, 54, 66)  // màu splitter handle
+            BackColor        = Color.FromArgb(50, 54, 66),  // màu splitter handle
+            Cursor           = Cursors.SizeNS               // ↕ gọn hơn HSplit mặc định
         };
 
         // Panel1: Canvas + RepPanel
