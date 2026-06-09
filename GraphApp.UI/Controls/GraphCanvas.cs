@@ -60,6 +60,10 @@ public class GraphCanvas : UserControl
     // AddEdge state
     private int _edgeFirstNodeId = -1;
 
+    // Inline rename state
+    private TextBox? _renameBox;
+    private Node?    _renameNode;
+
     // ─── Events ────────────────────────────────────────────────────────
     /// <summary>Kích hoạt sau mỗi thao tác thay đổi đồ thị (thêm/xóa node/edge).</summary>
     public event Action<Graph>? GraphChanged;
@@ -601,6 +605,86 @@ public class GraphCanvas : UserControl
 
         _dragNode   = node;
         _dragOffset = new PointF(worldPt.X - node.Position.X, worldPt.Y - node.Position.Y);
+    }
+
+    // ─── Double-click Rename ───────────────────────────────────────────
+
+    protected override void OnMouseDoubleClick(MouseEventArgs e)
+    {
+        base.OnMouseDoubleClick(e);
+        if (e.Button != MouseButtons.Left) return;
+
+        // Chỉ hoạt động ở chế độ Select
+        if (_mode != CanvasMode.Select) return;
+
+        var worldPt = ScreenToWorld(new PointF(e.X, e.Y));
+        var node = HitTestNode(worldPt);
+        if (node == null) return;
+
+        StartRename(node);
+    }
+
+    private void StartRename(Node node)
+    {
+        // Hủy rename cũ nếu đang mở
+        CommitRename(cancel: true);
+
+        _renameNode = node;
+
+        // Chuyển tọa độ world → screen
+        float sx = node.Position.X * _zoom + _panOffset.X;
+        float sy = node.Position.Y * _zoom + _panOffset.Y;
+
+        int boxW = Math.Max(70, (int)(NodeRadius * 2 * _zoom) + 10);
+        int boxH = 26;
+
+        _renameBox = new TextBox
+        {
+            Text      = node.Label,
+            Font      = new Font("Segoe UI", 10f, FontStyle.Bold),
+            TextAlign = HorizontalAlignment.Center,
+            BackColor = Color.FromArgb(240, 248, 255),
+            ForeColor = Color.FromArgb(30, 50, 90),
+            BorderStyle = BorderStyle.FixedSingle,
+            Width  = boxW,
+            Height = boxH,
+            Left   = (int)(sx - boxW / 2f),
+            Top    = (int)(sy - boxH / 2f)
+        };
+
+        _renameBox.SelectAll();
+
+        _renameBox.KeyDown += (_, ke) =>
+        {
+            if (ke.KeyCode == Keys.Enter)  { CommitRename(cancel: false); ke.SuppressKeyPress = true; }
+            if (ke.KeyCode == Keys.Escape) { CommitRename(cancel: true);  ke.SuppressKeyPress = true; }
+        };
+        _renameBox.LostFocus += (_, _) => CommitRename(cancel: false);
+
+        Controls.Add(_renameBox);
+        _renameBox.Focus();
+        Invalidate();
+    }
+
+    private void CommitRename(bool cancel)
+    {
+        if (_renameBox == null) return;
+
+        if (!cancel && _renameNode != null)
+        {
+            string newLabel = _renameBox.Text.Trim();
+            if (!string.IsNullOrEmpty(newLabel) && newLabel != _renameNode.Label)
+            {
+                _renameNode.Label = newLabel;
+                GraphChanged?.Invoke(_graph);
+            }
+        }
+
+        Controls.Remove(_renameBox);
+        _renameBox.Dispose();
+        _renameBox  = null;
+        _renameNode = null;
+        Invalidate();
     }
 
     // ─── Hit Testing ───────────────────────────────────────────────────

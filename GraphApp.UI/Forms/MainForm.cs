@@ -45,6 +45,8 @@ public partial class MainForm : Form
     // AnimPanel controls
     private ComboBox        _cmbAlgorithm  = null!;
     private ComboBox        _cmbStartNode  = null!;
+    private ComboBox        _cmbEndNode    = null!;   // đỉnh đích (Ford-Fulkerson / Dijkstra)
+    private Label           _lblEndNode    = null!;   // nhãn đỉnh đích
     private Button          _btnRun        = null!;
     private Label           _lblStep       = null!;
     private Button          _btnFirst      = null!;
@@ -67,6 +69,13 @@ public partial class MainForm : Form
     private bool _isRestoring   = false;
 
     // ─── Algorithm registry ────────────────────────────────────────────
+    // Thuật toán cần chọn đỉnh đích riêng
+    private static readonly HashSet<string> AlgosNeedEndNode =
+    [
+        "Dijkstra",
+        "Ford-Fulkerson"
+    ];
+
     private readonly Dictionary<string, Func<Graph, int, List<Core.Algorithms.Base.AlgorithmStep>>>
         _algorithms = new()
         {
@@ -436,6 +445,11 @@ public partial class MainForm : Form
         };
         ts.Items.Add(btnMatrix);
 
+        // Nhập nhanh — dialog text "A B 5"
+        var btnQuick = MakeActionBtn("📋  Nhập nhanh", "Nhập đồ thị từ văn bản: mỗi dòng 'Nguồn Đích [TrọngSố]'");
+        btnQuick.Click += (_, _) => ShowQuickImportDialog();
+        ts.Items.Add(btnQuick);
+
         // Export PNG
         var btnExport = MakeActionBtn("📷  Xuất PNG", "Xuất đồ thị ra file PNG (2× độ phân giải) [Ctrl+E]");
         btnExport.Click += (_, _) => ExportPng();
@@ -507,6 +521,7 @@ public partial class MainForm : Form
             _lblStep.Text  = "Bước: —";
             string algo    = _cmbAlgorithm.SelectedItem?.ToString() ?? "";
             SetDescText(GetAlgorithmHint(algo), Color.FromArgb(150, 200, 255));
+            UpdateEndNodeVisibility(algo);
         };
         row1.Controls.Add(_cmbAlgorithm);
 
@@ -520,6 +535,21 @@ public partial class MainForm : Form
             Margin        = new Padding(0, 0, 8, 0)
         };
         row1.Controls.Add(_cmbStartNode);
+
+        // ── ComboBox đỉnh đích (ẩn mặc định, hiện khi chọn Dijkstra / Ford-Fulkerson) ──
+        _lblEndNode = MakeLabel("Đỉnh đích:");
+        _lblEndNode.Visible = false;
+        row1.Controls.Add(_lblEndNode);
+
+        _cmbEndNode = new ComboBox
+        {
+            Width         = 80,
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Font          = new Font("Segoe UI", 9.5f),
+            Margin        = new Padding(0, 0, 8, 0),
+            Visible       = false
+        };
+        row1.Controls.Add(_cmbEndNode);
 
         _btnRun = new Button
         {
@@ -748,7 +778,34 @@ public partial class MainForm : Form
         // Chạy thuật toán
         _engine.Pause();
         var graph = _canvas.GetGraph().Clone();   // clone để không ảnh hưởng đồ thị gốc
-        var steps = runner(graph, startId);
+        List<Core.Algorithms.Base.AlgorithmStep> steps;
+
+        // ── Xử lý đặc biệt thuật toán cần đỉnh đích ─────────────────────
+        if (algoName.Contains("Ford-Fulkerson"))
+        {
+            int sinkId = _cmbEndNode.Visible && _cmbEndNode.SelectedItem is Node sinkNode
+                ? sinkNode.Id
+                : (graph.Nodes.LastOrDefault()?.Id ?? startId);
+
+            if (sinkId == startId && graph.Nodes.Count > 1)
+            {
+                MessageBox.Show("Nguồn và đích không được trùng nhau.\nVui lòng chọn đỉnh đích khác.",
+                    "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            steps = FordFulkerson.Run(graph, startId, sinkId);
+        }
+        else if (algoName.Contains("Dijkstra"))
+        {
+            int? endId = null;
+            if (_cmbEndNode.Visible && _cmbEndNode.SelectedItem is Node endNode && endNode.Id != startId)
+                endId = endNode.Id;
+            steps = Dijkstra.Run(graph, startId, endId);
+        }
+        else
+        {
+            steps = runner(graph, startId);
+        }
 
         _engine.Load(steps);
         SetAnimButtonsEnabled(true);
@@ -842,11 +899,163 @@ public partial class MainForm : Form
 
     private void RefreshStartNodeCombo()
     {
+        var nodes = _canvas.GetGraph().Nodes;
+
         _cmbStartNode.Items.Clear();
-        foreach (var n in _canvas.GetGraph().Nodes)
-            _cmbStartNode.Items.Add(n);
+        foreach (var n in nodes) _cmbStartNode.Items.Add(n);
         if (_cmbStartNode.Items.Count > 0)
             _cmbStartNode.SelectedIndex = 0;
+
+        // Đồng bộ combo đỉnh đích — mặc định chọn đỉnh cuối
+        _cmbEndNode.Items.Clear();
+        foreach (var n in nodes) _cmbEndNode.Items.Add(n);
+        if (_cmbEndNode.Items.Count > 0)
+            _cmbEndNode.SelectedIndex = _cmbEndNode.Items.Count - 1;
+    }
+
+    /// <summary>Hiện/ẩn nhãn + combo đỉnh đích tùy thuật toán đang chọn.</summary>
+    private void UpdateEndNodeVisibility(string algo)
+    {
+        bool needEnd = AlgosNeedEndNode.Any(k => algo.Contains(k));
+        _lblEndNode.Visible = needEnd;
+        _cmbEndNode.Visible = needEnd;
+    }
+
+    /// <summary>Hiện dialog nhập nhanh đồ thị từ text "A B 5" (mỗi dòng một cạnh).</summary>
+    private void ShowQuickImportDialog()
+    {
+        using var dlg = new Form
+        {
+            Text          = "📋 Nhập nhanh đồ thị",
+            Width         = 480,
+            Height        = 400,
+            StartPosition = FormStartPosition.CenterParent,
+            BackColor     = Color.FromArgb(32, 36, 44),
+            ForeColor     = Color.White,
+            Font          = new Font("Segoe UI", 9.5f),
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox   = false,
+            MinimizeBox   = false
+        };
+
+        var hint = new Label
+        {
+            Text      = "Nhập mỗi dòng: <Nguồn> <Đích> [TrọngSố]\r\n" +
+                        "Ví dụ:\r\n  A B 5\r\n  B C 3\r\n  A C 7\r\n" +
+                        "(Bỏ trọng số → mặc định = 1)",
+            Dock      = DockStyle.Top,
+            Height    = 90,
+            ForeColor = Color.FromArgb(160, 200, 255),
+            Font      = new Font("Segoe UI", 9f),
+            Padding   = new Padding(10, 8, 8, 4)
+        };
+
+        var rtb = new RichTextBox
+        {
+            Dock        = DockStyle.Fill,
+            BackColor   = Color.FromArgb(24, 28, 36),
+            ForeColor   = Color.FromArgb(210, 225, 255),
+            Font        = new Font("Consolas", 11f),
+            BorderStyle = BorderStyle.None,
+            ScrollBars  = RichTextBoxScrollBars.Vertical,
+            Padding     = new Padding(8)
+        };
+
+        var pnlBottom = new FlowLayoutPanel
+        {
+            Dock          = DockStyle.Bottom,
+            Height        = 50,
+            FlowDirection = FlowDirection.RightToLeft,
+            BackColor     = Color.FromArgb(28, 32, 40),
+            Padding       = new Padding(8, 8, 8, 8)
+        };
+
+        var chkDirected = new CheckBox
+        {
+            Text      = "Có hướng",
+            ForeColor = Color.FromArgb(200, 200, 220),
+            Checked   = _canvas.GetGraph().Directed,
+            Margin    = new Padding(12, 0, 0, 0),
+            AutoSize  = true
+        };
+
+        var btnOk = new Button
+        {
+            Text      = "✔  Áp dụng",
+            Width     = 110, Height = 32,
+            BackColor = Color.FromArgb(46, 160, 67),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            DialogResult = DialogResult.OK
+        };
+        btnOk.FlatAppearance.BorderSize = 0;
+
+        var btnCancel = new Button
+        {
+            Text      = "Hủy",
+            Width     = 70, Height = 32,
+            BackColor = Color.FromArgb(60, 64, 75),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            DialogResult = DialogResult.Cancel
+        };
+        btnCancel.FlatAppearance.BorderSize = 0;
+
+        pnlBottom.Controls.Add(btnOk);
+        pnlBottom.Controls.Add(btnCancel);
+        pnlBottom.Controls.Add(chkDirected);
+
+        dlg.Controls.Add(rtb);
+        dlg.Controls.Add(hint);
+        dlg.Controls.Add(pnlBottom);
+        dlg.AcceptButton = btnOk;
+        dlg.CancelButton = btnCancel;
+
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+        // Parse từng dòng "A B [w]"
+        var edgeList = new List<(string Src, string Tgt, double W)>();
+        foreach (var raw in rtb.Lines)
+        {
+            var line = raw.Trim();
+            if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#')) continue;
+
+            var parts = line.Split(new[] {' ', '\t', ','}, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 2) continue;
+
+            string src = parts[0];
+            string tgt = parts[1];
+            double w   = parts.Length >= 3 && double.TryParse(parts[2],
+                System.Globalization.NumberStyles.Any,
+                System.Globalization.CultureInfo.InvariantCulture, out double pw) ? pw : 1.0;
+
+            if (src != tgt)
+                edgeList.Add((src, tgt, w));
+        }
+
+        if (edgeList.Count == 0)
+        {
+            MessageBox.Show("Không tìm thấy cạnh hợp lệ.\nKiểm tra lại định dạng: A B 5",
+                "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        var newGraph = GraphApp.Core.Converters.GraphConverter.FromEdgeList(edgeList, chkDirected.Checked);
+
+        _engine.Pause();
+        _suppressDirectedChange = true;
+        _btnDirected.Checked   = newGraph.Directed;
+        _btnDirected.Text      = newGraph.Directed ? "⇄  Có hướng ✓" : "⇄  Có hướng";
+        _btnDirected.ForeColor = newGraph.Directed ? Color.FromArgb(255, 200, 60) : Color.White;
+        _suppressDirectedChange = false;
+
+        _canvas.RefreshGraph(newGraph);
+        _canvas.FitToScreen();
+        RefreshStartNodeCombo();
+        ResetAnimUI();
+        UpdateStatus();
+        if (_repPanel.Visible) _repPanel.RefreshFromGraph(newGraph);
+        _lblMode.Text = $"✓ Đã nhập {edgeList.Count} cạnh từ văn bản   ";
     }
 
     private void SetAnimButtonsEnabled(bool enabled)
@@ -881,11 +1090,11 @@ public partial class MainForm : Form
     {
         var s when s.Contains("BFS")         => "💡 BFS: Duyệt theo chiều rộng (Queue). Chọn đỉnh bắt đầu.",
         var s when s.Contains("DFS")         => "💡 DFS: Duyệt theo chiều sâu (Stack). Chọn đỉnh bắt đầu.",
-        var s when s.Contains("Dijkstra")    => "💡 Dijkstra: Đường ngắn nhất (đồ thị có trọng số ≥ 0). Chọn đỉnh nguồn.",
+        var s when s.Contains("Dijkstra")    => "💡 Dijkstra: Đường ngắn nhất (trọng số ≥ 0).\n   Chọn Đỉnh bắt đầu + Đỉnh đích → tô màu đường đi cụ thể.\n   Để trống Đỉnh đích = tìm khoảng cách đến tất cả đỉnh.",
         var s when s.Contains("Bipartite")   => "💡 Bipartite: Kiểm tra 2 phía bằng BFS tô màu. Không cần chọn đỉnh.",
         var s when s.Contains("Prim")        => "💡 Prim: MST cho đồ thị VÔ HƯỚNG có trọng số. Chọn đỉnh bắt đầu.",
         var s when s.Contains("Kruskal")     => "💡 Kruskal: MST bằng Union-Find. Không cần chọn đỉnh bắt đầu.",
-        var s when s.Contains("Ford")        => "💡 Ford-Fulkerson: Max Flow trên đồ thị CÓ HƯỚNG. Nguồn = đỉnh chọn, Đích = đỉnh cuối.",
+        var s when s.Contains("Ford")        => "💡 Ford-Fulkerson: Max Flow trên đồ thị CÓ HƯỚNG.\n   Chọn Đỉnh nguồn (bắt đầu) và Đỉnh đích rõ ràng để tính luồng cực đại.",
         var s when s.Contains("Fleury")      => "💡 Fleury: Đường/Chu trình Euler (có bridge detection). Chọn đỉnh bắt đầu.",
         var s when s.Contains("Hierholzer")  => "💡 Hierholzer: Đường/Chu trình Euler O(E) bằng stack. Chọn đỉnh bắt đầu.",
         _                                    => "💡 Chọn thuật toán và bấm ▶ Chạy."
